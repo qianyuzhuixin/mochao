@@ -1,0 +1,35 @@
+// ============================================
+// 暗色主题 CSS 变量
+// ============================================
+
+[data-theme="dark"] {
+  --color-primary: #6C8FFF;
+  --color-primary-light: #8BA5FF;
+  --color-primary-dark: #5A7AE6;
+  --color-primary-bg: rgba(108, 143, 255, 0.12);
+
+  --color-bg: #1A1A2E;
+  --color-bg-secondary: #16213E;
+  --color-bg-tertiary: #0F1626;
+
+  --color-text: #E0E0E0;
+  --color-text-secondary: #A0A0B0;
+  --color-text-placeholder: #6C7293;
+
+  --color-success: #73D13D;
+  --color-warning: #FFA940;
+  --color-error: #FF7875;
+  --color-info: #5C6B77;
+
+  --color-border: #2D3748;
+  --color-border-light: #1E2A3A;
+
+  --color-card-bg: #1E2A3A;
+  --color-overlay: rgba(26, 26, 46, 0.9);
+  --color-mask: rgba(0, 0, 0, 0.7);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-base: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}

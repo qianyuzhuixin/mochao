@@ -1,0 +1,35 @@
+// ============================================
+// 护眼绿主题 CSS 变量
+// ============================================
+
+[data-theme="eye-care"] {
+  --color-primary: #52C41A;
+  --color-primary-light: #73D13D;
+  --color-primary-dark: #389E0D;
+  --color-primary-bg: rgba(82, 196, 26, 0.1);
+
+  --color-bg: #C7EDCC;
+  --color-bg-secondary: #E8F5E9;
+  --color-bg-tertiary: #D5EDD8;
+
+  --color-text: #2D3436;
+  --color-text-secondary: #636E72;
+  --color-text-placeholder: #95A5A6;
+
+  --color-success: #00B894;
+  --color-warning: #FDCB6E;
+  --color-error: #E17055;
+  --color-info: #74B9FF;
+
+  --color-border: #B5D4B8;
+  --color-border-light: #D5EDD8;
+
+  --color-card-bg: #D5EDD8;
+  --color-overlay: rgba(199, 237, 204, 0.9);
+  --color-mask: rgba(0, 0, 0, 0.4);
+
+  --shadow-sm: 0 2px 8px rgba(45, 52, 54, 0.08);
+  --shadow-base: 0 4px 12px rgba(45, 52, 54, 0.1);
+  --shadow-md: 0 6px 16px rgba(45, 52, 54, 0.12);
+  --shadow-lg: 0 8px 24px rgba(45, 52, 54, 0.15);
+}

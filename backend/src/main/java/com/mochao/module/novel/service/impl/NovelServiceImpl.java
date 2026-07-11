@@ -1,0 +1,523 @@
+package com.mochao.module.novel.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mochao.common.constant.Constants;
+import com.mochao.common.exception.BusinessException;
+import com.mochao.common.result.ResultCode;
+import com.mochao.module.novel.dto.*;
+import com.mochao.module.novel.entity.*;
+import com.mochao.module.novel.mapper.*;
+import com.mochao.module.novel.service.NovelService;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class NovelServiceImpl implements NovelService {
+
+    private final NovelMapper novelMapper;
+    private final NovelOutlineMapper novelOutlineMapper;
+    private final NovelWorldviewMapper novelWorldviewMapper;
+    private final NovelCharacterMapper novelCharacterMapper;
+    private final NovelItemMapper novelItemMapper;
+    private final NovelChapterOutlineMapper novelChapterOutlineMapper;
+    private final NovelChapterMapper novelChapterMapper;
+    private final NovelDailyProgressMapper novelDailyProgressMapper;
+
+    public NovelServiceImpl(NovelMapper novelMapper,
+                            NovelOutlineMapper novelOutlineMapper,
+                            NovelWorldviewMapper novelWorldviewMapper,
+                            NovelCharacterMapper novelCharacterMapper,
+                            NovelItemMapper novelItemMapper,
+                            NovelChapterOutlineMapper novelChapterOutlineMapper,
+                            NovelChapterMapper novelChapterMapper,
+                            NovelDailyProgressMapper novelDailyProgressMapper) {
+        this.novelMapper = novelMapper;
+        this.novelOutlineMapper = novelOutlineMapper;
+        this.novelWorldviewMapper = novelWorldviewMapper;
+        this.novelCharacterMapper = novelCharacterMapper;
+        this.novelItemMapper = novelItemMapper;
+        this.novelChapterOutlineMapper = novelChapterOutlineMapper;
+        this.novelChapterMapper = novelChapterMapper;
+        this.novelDailyProgressMapper = novelDailyProgressMapper;
+    }
+
+    // ==================== Novel CRUD ====================
+
+    @Override
+    public Page<Novel> getNovelList(Long userId, Integer page, Integer size, String status) {
+        Page<Novel> pageObj = new Page<>(page, size);
+        LambdaQueryWrapper<Novel> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Novel::getUserId, userId);
+        if (StringUtils.hasText(status)) {
+            wrapper.eq(Novel::getStatus, status);
+        }
+        wrapper.orderByDesc(Novel::getUpdatedAt);
+        return novelMapper.selectPage(pageObj, wrapper);
+    }
+
+    @Override
+    public Novel getNovelById(Long id, Long userId) {
+        return getOwnedNovel(id, userId);
+    }
+
+    @Override
+    public Novel createNovel(NovelCreateDTO dto, Long userId) {
+        Novel novel = new Novel();
+        novel.setUserId(userId);
+        novel.setTitle(dto.getTitle());
+        novel.setGenre(dto.getGenre());
+        novel.setSummary(dto.getSummary());
+        novel.setCover(dto.getCover());
+        novel.setStatus(Constants.NOVEL_STATUS_DRAFT);
+        novel.setTargetWords(dto.getTargetWords() != null ? dto.getTargetWords() : 0);
+        novel.setTotalWords(0);
+        novel.setChapterCount(0);
+        novel.setCompletedChapters(0);
+        novel.setCreatedAt(LocalDateTime.now());
+        novel.setUpdatedAt(LocalDateTime.now());
+        novelMapper.insert(novel);
+        return novel;
+    }
+
+    @Override
+    public Novel updateNovel(Long id, NovelUpdateDTO dto, Long userId) {
+        Novel novel = getOwnedNovel(id, userId);
+        if (dto.getTitle() != null) novel.setTitle(dto.getTitle());
+        if (dto.getGenre() != null) novel.setGenre(dto.getGenre());
+        if (dto.getSummary() != null) novel.setSummary(dto.getSummary());
+        if (dto.getCover() != null) novel.setCover(dto.getCover());
+        if (dto.getStatus() != null) novel.setStatus(dto.getStatus());
+        if (dto.getTargetWords() != null) novel.setTargetWords(dto.getTargetWords());
+        novel.setUpdatedAt(LocalDateTime.now());
+        novelMapper.updateById(novel);
+        return novel;
+    }
+
+    @Override
+    public void deleteNovel(Long id, Long userId) {
+        Novel novel = getOwnedNovel(id, userId);
+        // 删除关联数据
+        novelOutlineMapper.delete(new LambdaQueryWrapper<NovelOutline>().eq(NovelOutline::getNovelId, id));
+        novelWorldviewMapper.delete(new LambdaQueryWrapper<NovelWorldview>().eq(NovelWorldview::getNovelId, id));
+        novelCharacterMapper.delete(new LambdaQueryWrapper<NovelCharacter>().eq(NovelCharacter::getNovelId, id));
+        novelItemMapper.delete(new LambdaQueryWrapper<NovelItem>().eq(NovelItem::getNovelId, id));
+        novelChapterOutlineMapper.delete(new LambdaQueryWrapper<NovelChapterOutline>().eq(NovelChapterOutline::getNovelId, id));
+        novelChapterMapper.delete(new LambdaQueryWrapper<NovelChapter>().eq(NovelChapter::getNovelId, id));
+        novelDailyProgressMapper.delete(new LambdaQueryWrapper<NovelDailyProgress>().eq(NovelDailyProgress::getNovelId, id));
+        novelMapper.deleteById(id);
+    }
+
+    // ==================== Progress ====================
+
+    @Override
+    public Map<String, Object> getNovelProgress(Long id, Long userId) {
+        Novel novel = getOwnedNovel(id, userId);
+        Map<String, Object> progress = new HashMap<>();
+        progress.put("totalWords", novel.getTotalWords());
+        progress.put("targetWords", novel.getTargetWords());
+        progress.put("chapterCount", novel.getChapterCount());
+        progress.put("completedChapters", novel.getCompletedChapters());
+        double completionRate = novel.getTargetWords() > 0
+                ? (double) novel.getTotalWords() / novel.getTargetWords() * 100 : 0;
+        progress.put("completionRate", Math.round(completionRate * 100) / 100.0);
+
+        // 今日进度
+        LocalDate today = LocalDate.now();
+        NovelDailyProgress todayProgress = novelDailyProgressMapper.selectOne(
+                new LambdaQueryWrapper<NovelDailyProgress>()
+                        .eq(NovelDailyProgress::getNovelId, id)
+                        .eq(NovelDailyProgress::getProgressDate, today));
+        progress.put("todayWords", todayProgress != null ? todayProgress.getWordsWritten() : 0);
+
+        return progress;
+    }
+
+    // ==================== Outline ====================
+
+    @Override
+    public NovelOutline getOutline(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelOutline outline = novelOutlineMapper.selectOne(
+                new LambdaQueryWrapper<NovelOutline>().eq(NovelOutline::getNovelId, novelId));
+        return outline;
+    }
+
+    @Override
+    public NovelOutline updateOutline(Long novelId, String content, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelOutline outline = novelOutlineMapper.selectOne(
+                new LambdaQueryWrapper<NovelOutline>().eq(NovelOutline::getNovelId, novelId));
+        if (outline == null) {
+            outline = new NovelOutline();
+            outline.setNovelId(novelId);
+            outline.setContent(content);
+            outline.setCreatedAt(LocalDateTime.now());
+            outline.setUpdatedAt(LocalDateTime.now());
+            novelOutlineMapper.insert(outline);
+        } else {
+            outline.setContent(content);
+            outline.setUpdatedAt(LocalDateTime.now());
+            novelOutlineMapper.updateById(outline);
+        }
+        return outline;
+    }
+
+    // ==================== Worldview ====================
+
+    @Override
+    public NovelWorldview getWorldview(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        return novelWorldviewMapper.selectOne(
+                new LambdaQueryWrapper<NovelWorldview>().eq(NovelWorldview::getNovelId, novelId));
+    }
+
+    @Override
+    public NovelWorldview updateWorldview(Long novelId, String content, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelWorldview worldview = novelWorldviewMapper.selectOne(
+                new LambdaQueryWrapper<NovelWorldview>().eq(NovelWorldview::getNovelId, novelId));
+        if (worldview == null) {
+            worldview = new NovelWorldview();
+            worldview.setNovelId(novelId);
+            worldview.setContent(content);
+            worldview.setCreatedAt(LocalDateTime.now());
+            worldview.setUpdatedAt(LocalDateTime.now());
+            novelWorldviewMapper.insert(worldview);
+        } else {
+            worldview.setContent(content);
+            worldview.setUpdatedAt(LocalDateTime.now());
+            novelWorldviewMapper.updateById(worldview);
+        }
+        return worldview;
+    }
+
+    // ==================== Characters ====================
+
+    @Override
+    public List<NovelCharacter> getCharacters(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        return novelCharacterMapper.selectList(
+                new LambdaQueryWrapper<NovelCharacter>()
+                        .eq(NovelCharacter::getNovelId, novelId)
+                        .orderByAsc(NovelCharacter::getSortOrder));
+    }
+
+    @Override
+    public NovelCharacter createCharacter(Long novelId, NovelCharacterDTO dto, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelCharacter character = new NovelCharacter();
+        character.setNovelId(novelId);
+        character.setName(dto.getName());
+        character.setRole(dto.getRole());
+        character.setAvatar(dto.getAvatar());
+        character.setAppearance(dto.getAppearance());
+        character.setPersonality(dto.getPersonality());
+        character.setBackground(dto.getBackground());
+        character.setRelationships(dto.getRelationships());
+        character.setFirstAppearance(dto.getFirstAppearance());
+        character.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
+        character.setCreatedAt(LocalDateTime.now());
+        character.setUpdatedAt(LocalDateTime.now());
+        novelCharacterMapper.insert(character);
+        return character;
+    }
+
+    @Override
+    public NovelCharacter updateCharacter(Long characterId, NovelCharacterDTO dto, Long userId) {
+        NovelCharacter character = novelCharacterMapper.selectById(characterId);
+        if (character == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "人物不存在");
+        }
+        getOwnedNovel(character.getNovelId(), userId);
+        if (dto.getName() != null) character.setName(dto.getName());
+        if (dto.getRole() != null) character.setRole(dto.getRole());
+        if (dto.getAvatar() != null) character.setAvatar(dto.getAvatar());
+        if (dto.getAppearance() != null) character.setAppearance(dto.getAppearance());
+        if (dto.getPersonality() != null) character.setPersonality(dto.getPersonality());
+        if (dto.getBackground() != null) character.setBackground(dto.getBackground());
+        if (dto.getRelationships() != null) character.setRelationships(dto.getRelationships());
+        if (dto.getFirstAppearance() != null) character.setFirstAppearance(dto.getFirstAppearance());
+        if (dto.getSortOrder() != null) character.setSortOrder(dto.getSortOrder());
+        character.setUpdatedAt(LocalDateTime.now());
+        novelCharacterMapper.updateById(character);
+        return character;
+    }
+
+    @Override
+    public void deleteCharacter(Long characterId, Long userId) {
+        NovelCharacter character = novelCharacterMapper.selectById(characterId);
+        if (character == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "人物不存在");
+        }
+        getOwnedNovel(character.getNovelId(), userId);
+        novelCharacterMapper.deleteById(characterId);
+    }
+
+    // ==================== Items ====================
+
+    @Override
+    public List<NovelItem> getItems(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        return novelItemMapper.selectList(
+                new LambdaQueryWrapper<NovelItem>()
+                        .eq(NovelItem::getNovelId, novelId)
+                        .orderByAsc(NovelItem::getSortOrder));
+    }
+
+    @Override
+    public NovelItem createItem(Long novelId, NovelItemDTO dto, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelItem item = new NovelItem();
+        item.setNovelId(novelId);
+        item.setName(dto.getName());
+        item.setCategory(dto.getCategory());
+        item.setAppearance(dto.getAppearance());
+        item.setOrigin(dto.getOrigin());
+        item.setAttributes(dto.getAttributes());
+        item.setOwner(dto.getOwner());
+        item.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
+        item.setCreatedAt(LocalDateTime.now());
+        item.setUpdatedAt(LocalDateTime.now());
+        novelItemMapper.insert(item);
+        return item;
+    }
+
+    @Override
+    public NovelItem updateItem(Long itemId, NovelItemDTO dto, Long userId) {
+        NovelItem item = novelItemMapper.selectById(itemId);
+        if (item == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "物品不存在");
+        }
+        getOwnedNovel(item.getNovelId(), userId);
+        if (dto.getName() != null) item.setName(dto.getName());
+        if (dto.getCategory() != null) item.setCategory(dto.getCategory());
+        if (dto.getAppearance() != null) item.setAppearance(dto.getAppearance());
+        if (dto.getOrigin() != null) item.setOrigin(dto.getOrigin());
+        if (dto.getAttributes() != null) item.setAttributes(dto.getAttributes());
+        if (dto.getOwner() != null) item.setOwner(dto.getOwner());
+        if (dto.getSortOrder() != null) item.setSortOrder(dto.getSortOrder());
+        item.setUpdatedAt(LocalDateTime.now());
+        novelItemMapper.updateById(item);
+        return item;
+    }
+
+    @Override
+    public void deleteItem(Long itemId, Long userId) {
+        NovelItem item = novelItemMapper.selectById(itemId);
+        if (item == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "物品不存在");
+        }
+        getOwnedNovel(item.getNovelId(), userId);
+        novelItemMapper.deleteById(itemId);
+    }
+
+    // ==================== Chapter Outlines ====================
+
+    @Override
+    public List<NovelChapterOutline> getChapterOutlines(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        return novelChapterOutlineMapper.selectList(
+                new LambdaQueryWrapper<NovelChapterOutline>()
+                        .eq(NovelChapterOutline::getNovelId, novelId)
+                        .orderByAsc(NovelChapterOutline::getChapterNumber));
+    }
+
+    @Override
+    public NovelChapterOutline createChapterOutline(Long novelId, NovelChapterOutlineDTO dto, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelChapterOutline outline = new NovelChapterOutline();
+        outline.setNovelId(novelId);
+        outline.setChapterNumber(dto.getChapterNumber());
+        outline.setTitle(dto.getTitle());
+        outline.setSummary(dto.getSummary());
+        outline.setDetail(dto.getDetail());
+        outline.setStatus(Constants.CHAPTER_STATUS_DRAFT);
+        outline.setCreatedAt(LocalDateTime.now());
+        outline.setUpdatedAt(LocalDateTime.now());
+        novelChapterOutlineMapper.insert(outline);
+        return outline;
+    }
+
+    @Override
+    public NovelChapterOutline updateChapterOutline(Long outlineId, NovelChapterOutlineDTO dto, Long userId) {
+        NovelChapterOutline outline = novelChapterOutlineMapper.selectById(outlineId);
+        if (outline == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "章纲不存在");
+        }
+        getOwnedNovel(outline.getNovelId(), userId);
+        if (dto.getChapterNumber() != null) outline.setChapterNumber(dto.getChapterNumber());
+        if (dto.getTitle() != null) outline.setTitle(dto.getTitle());
+        if (dto.getSummary() != null) outline.setSummary(dto.getSummary());
+        if (dto.getDetail() != null) outline.setDetail(dto.getDetail());
+        if (dto.getStatus() != null) outline.setStatus(dto.getStatus());
+        outline.setUpdatedAt(LocalDateTime.now());
+        novelChapterOutlineMapper.updateById(outline);
+        return outline;
+    }
+
+    @Override
+    public void deleteChapterOutline(Long outlineId, Long userId) {
+        NovelChapterOutline outline = novelChapterOutlineMapper.selectById(outlineId);
+        if (outline == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "章纲不存在");
+        }
+        getOwnedNovel(outline.getNovelId(), userId);
+        novelChapterOutlineMapper.deleteById(outlineId);
+    }
+
+    // ==================== Chapters ====================
+
+    @Override
+    public Page<NovelChapter> getChapters(Long novelId, Long userId, Integer page, Integer size) {
+        getOwnedNovel(novelId, userId);
+        Page<NovelChapter> pageObj = new Page<>(page, size);
+        LambdaQueryWrapper<NovelChapter> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(NovelChapter::getNovelId, novelId)
+                .orderByAsc(NovelChapter::getChapterNumber);
+        return novelChapterMapper.selectPage(pageObj, wrapper);
+    }
+
+    @Override
+    public NovelChapter getChapter(Long chapterId, Long userId) {
+        NovelChapter chapter = novelChapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "章节不存在");
+        }
+        getOwnedNovel(chapter.getNovelId(), userId);
+        return chapter;
+    }
+
+    @Override
+    public NovelChapter createChapter(Long novelId, NovelChapterDTO dto, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelChapter chapter = new NovelChapter();
+        chapter.setNovelId(novelId);
+        chapter.setOutlineId(dto.getOutlineId());
+        chapter.setChapterNumber(dto.getChapterNumber());
+        chapter.setTitle(dto.getTitle());
+        chapter.setContent(dto.getContent());
+        chapter.setWordCount(dto.getContent() != null ? dto.getContent().length() : 0);
+        chapter.setStatus(dto.getStatus() != null ? dto.getStatus() : Constants.CHAPTER_STATUS_DRAFT);
+        chapter.setCreatedAt(LocalDateTime.now());
+        chapter.setUpdatedAt(LocalDateTime.now());
+        novelChapterMapper.insert(chapter);
+
+        // 更新小说统计
+        Novel novel = novelMapper.selectById(novelId);
+        novel.setChapterCount(novel.getChapterCount() + 1);
+        novel.setTotalWords(novel.getTotalWords() + chapter.getWordCount());
+        if (Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus())) {
+            novel.setCompletedChapters(novel.getCompletedChapters() + 1);
+        }
+        novel.setUpdatedAt(LocalDateTime.now());
+        novelMapper.updateById(novel);
+
+        // 更新每日进度
+        updateDailyProgress(novelId, userId, chapter.getWordCount());
+
+        return chapter;
+    }
+
+    @Override
+    public NovelChapter updateChapter(Long chapterId, NovelChapterDTO dto, Long userId) {
+        NovelChapter chapter = novelChapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "章节不存在");
+        }
+        getOwnedNovel(chapter.getNovelId(), userId);
+
+        int oldWordCount = chapter.getWordCount() != null ? chapter.getWordCount() : 0;
+        boolean wasPublished = Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus());
+
+        if (dto.getOutlineId() != null) chapter.setOutlineId(dto.getOutlineId());
+        if (dto.getChapterNumber() != null) chapter.setChapterNumber(dto.getChapterNumber());
+        if (dto.getTitle() != null) chapter.setTitle(dto.getTitle());
+        if (dto.getContent() != null) {
+            chapter.setContent(dto.getContent());
+            chapter.setWordCount(dto.getContent().length());
+        }
+        if (dto.getStatus() != null) chapter.setStatus(dto.getStatus());
+        chapter.setUpdatedAt(LocalDateTime.now());
+        novelChapterMapper.updateById(chapter);
+
+        // 更新小说统计
+        Novel novel = novelMapper.selectById(chapter.getNovelId());
+        int newWordCount = chapter.getWordCount() != null ? chapter.getWordCount() : 0;
+        novel.setTotalWords(novel.getTotalWords() - oldWordCount + newWordCount);
+        boolean nowPublished = Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus());
+        if (nowPublished && !wasPublished) {
+            novel.setCompletedChapters(novel.getCompletedChapters() + 1);
+        } else if (!nowPublished && wasPublished) {
+            novel.setCompletedChapters(novel.getCompletedChapters() - 1);
+        }
+        novel.setUpdatedAt(LocalDateTime.now());
+        novelMapper.updateById(novel);
+
+        return chapter;
+    }
+
+    @Override
+    public void deleteChapter(Long chapterId, Long userId) {
+        NovelChapter chapter = novelChapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "章节不存在");
+        }
+        getOwnedNovel(chapter.getNovelId(), userId);
+
+        // 更新小说统计
+        Novel novel = novelMapper.selectById(chapter.getNovelId());
+        novel.setChapterCount(novel.getChapterCount() - 1);
+        novel.setTotalWords(novel.getTotalWords() - (chapter.getWordCount() != null ? chapter.getWordCount() : 0));
+        if (Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus())) {
+            novel.setCompletedChapters(novel.getCompletedChapters() - 1);
+        }
+        novel.setUpdatedAt(LocalDateTime.now());
+        novelMapper.updateById(novel);
+
+        novelChapterMapper.deleteById(chapterId);
+    }
+
+    // ==================== Helper ====================
+
+    private Novel getOwnedNovel(Long novelId, Long userId) {
+        Novel novel = novelMapper.selectById(novelId);
+        if (novel == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "小说不存在");
+        }
+        if (!userId.equals(novel.getUserId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权操作他人小说");
+        }
+        return novel;
+    }
+
+    private void updateDailyProgress(Long novelId, Long userId, Integer wordsWritten) {
+        LocalDate today = LocalDate.now();
+        NovelDailyProgress progress = novelDailyProgressMapper.selectOne(
+                new LambdaQueryWrapper<NovelDailyProgress>()
+                        .eq(NovelDailyProgress::getNovelId, novelId)
+                        .eq(NovelDailyProgress::getProgressDate, today));
+        if (progress == null) {
+            progress = new NovelDailyProgress();
+            progress.setNovelId(novelId);
+            progress.setUserId(userId);
+            progress.setProgressDate(today);
+            progress.setWordsWritten(wordsWritten);
+            progress.setChaptersCompleted(1);
+            progress.setCreatedAt(LocalDateTime.now());
+            progress.setUpdatedAt(LocalDateTime.now());
+            novelDailyProgressMapper.insert(progress);
+        } else {
+            progress.setWordsWritten(progress.getWordsWritten() + wordsWritten);
+            progress.setChaptersCompleted(progress.getChaptersCompleted() + 1);
+            progress.setUpdatedAt(LocalDateTime.now());
+            novelDailyProgressMapper.updateById(progress);
+        }
+    }
+}

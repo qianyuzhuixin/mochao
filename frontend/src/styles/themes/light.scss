@@ -1,0 +1,41 @@
+// ============================================
+// 亮色主题 CSS 变量
+// ============================================
+
+:root,
+[data-theme="light"] {
+  --color-primary: #4A6CF7;
+  --color-primary-light: #6B8BF9;
+  --color-primary-dark: #3A5BE0;
+  --color-primary-bg: rgba(74, 108, 247, 0.08);
+
+  --color-bg: #FFFFFF;
+  --color-bg-secondary: #F5F7FA;
+  --color-bg-tertiary: #EBEEF5;
+
+  --color-text: #1A1A2E;
+  --color-text-secondary: #6C7293;
+  --color-text-placeholder: #A0A0B0;
+
+  --color-success: #52C41A;
+  --color-warning: #FAAD14;
+  --color-error: #FF4D4F;
+  --color-info: #909399;
+
+  --color-border: #E4E7ED;
+  --color-border-light: #EBEEF5;
+
+  --color-card-bg: #FFFFFF;
+  --color-overlay: rgba(255, 255, 255, 0.9);
+  --color-mask: rgba(0, 0, 0, 0.5);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-base: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+// Element UI 主题色覆盖
+[data-theme="light"] {
+  --el-color-primary: #4A6CF7;
+}

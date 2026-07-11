@@ -1,0 +1,53 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  profiles:
+    active: dev
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  global-config:
+    db-config:
+      table-prefix: t_
+      id-type: auto
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: mochao-secret-key-2024-very-long-secret-key-for-jwt
+  expiration: 86400000
+
+# ==================== AI 写作配置 ====================
+# 方案一：使用 OpenAI 官方 API（需要代理）
+# 方案二：使用 DeepSeek（国内直连，OpenAI 兼容，推荐）
+#   api-url: https://api.deepseek.com/v1/chat/completions
+#   api-key: sk-your-deepseek-key
+#   model: deepseek-chat
+# 方案三：使用其他兼容 API（Moonshot/阿里百炼/硅基流动等）
+# ======================================================
+ai:
+  provider: openai
+  api-url: https://api.openai.com/v1/chat/completions
+  api-key: your-api-key-here
+  model: gpt-3.5-turbo
+  max-tokens: 2000
+  temperature: 0.8
+  # HTTP 代理（访问 OpenAI 需要，不配则直连）
+  proxy-host: ''
+  proxy-port: 0
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+  api-docs:
+    path: /v3/api-docs

@@ -1,0 +1,81 @@
+# ========== Java 后端 ==========
+# 编译生成的字节码文件[reference:0][reference:1]
+*.class
+
+# Maven 构建输出目录[reference:2][reference:3]
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# Gradle 构建输出目录
+build/
+.gradle/
+
+# ========== Vue / Node.js 前端 ==========
+# 前端依赖目录（体积大，必须忽略）[reference:4][reference:5]
+node_modules/
+
+# 前端构建产物（dist、build 等）[reference:6][reference:7]
+/dist
+/build
+
+# 包管理器的锁文件（可选，根据团队习惯）[reference:8][reference:9]
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ========== IDE 和操作系统 ==========
+# IntelliJ IDEA[reference:10][reference:11]
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code[reference:12]
+.vscode/
+
+# Eclipse[reference:13]
+.classpath
+.project
+.settings/
+.apt_generated
+.factorypath
+
+# NetBeans[reference:14]
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# macOS[reference:15]
+.DS_Store
+
+# Windows[reference:16]
+Thumbs.db
+ehthumbs.db
+
+# ========== 日志和临时文件 ==========
+# 日志文件[reference:17][reference:18]
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件[reference:19]
+*.tmp
+*.swp
+*.swo
+*.orig
+*.rej
+
+# ========== 环境变量和敏感信息 ==========
+# 本地环境配置文件（含敏感信息，必须忽略）[reference:20]
+.env.local
+.env.*.local
+.env
+
+# ========== 其他 ==========
+# 帮助文件
+HELP.md[reference:21]
