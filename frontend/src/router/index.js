@@ -56,6 +56,12 @@ const routes = [
     meta: { title: '好词好句', requiresAuth: true }
   },
   {
+    path: '/music',
+    name: 'MusicManager',
+    component: () => import('@/views/music/MusicManager.vue'),
+    meta: { title: '背景音乐', requiresAuth: true }
+  },
+  {
     path: '/novels',
     name: 'NovelList',
     component: () => import('@/views/novels/NovelList.vue'),

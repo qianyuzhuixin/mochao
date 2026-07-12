@@ -14,7 +14,6 @@
               <span class="chapter-sub-title">{{ chapterTitle }}</span>
             </template>
           </span>
-          <music-player class="practice-music" />
           <div class="flex-1" />
           <el-tooltip content="专注模式 (Esc 退出)" placement="bottom">
             <el-button type="text" icon="el-icon-full-screen" @click="enterFocusMode">
@@ -135,14 +134,13 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import TextComparator from '@/components/practice/TextComparator.vue'
 import RealtimeStats from '@/components/practice/RealtimeStats.vue'
 import ScoreCard from '@/components/practice/ScoreCard.vue'
-import MusicPlayer from '@/components/practice/MusicPlayer.vue'
 import { startPractice, getActivePractice, updateProgress, completePractice, pausePractice, resumePractice } from '@/api/practice'
 import { getBookById, getChapters } from '@/api/book'
 import { createCollection } from '@/api/collection'
 
 export default {
   name: 'Practice',
-  components: { DefaultLayout, TextComparator, RealtimeStats, ScoreCard, MusicPlayer },
+  components: { DefaultLayout, TextComparator, RealtimeStats, ScoreCard },
   data() {
     return {
       loading: true,

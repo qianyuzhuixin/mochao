@@ -76,6 +76,9 @@ yarn-error.log*
 .env.*.local
 .env
 
+# ========== 用户上传文件 ==========
+uploads/
+
 # ========== 其他 ==========
 # 帮助文件
 HELP.md[reference:21]

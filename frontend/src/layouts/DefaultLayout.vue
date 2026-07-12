@@ -16,6 +16,7 @@
             <el-menu-item index="/collections">好词好句</el-menu-item>
             <el-menu-item index="/novels">我的小说</el-menu-item>
             <el-menu-item index="/dashboard">数据看板</el-menu-item>
+            <el-menu-item index="/music">背景音乐</el-menu-item>
           </el-menu>
         </div>
         <div class="header-right">
@@ -47,6 +48,9 @@
       </slot>
     </el-main>
 
+    <!-- 全局背景音乐播放器 -->
+    <music-player />
+
     <el-footer class="layout-footer">
       <span>墨抄 MoChao &copy; {{ year }} - 网文创作练笔平台</span>
     </el-footer>
@@ -68,6 +72,7 @@
         <el-menu-item index="/collections">好词好句</el-menu-item>
         <el-menu-item index="/novels">我的小说</el-menu-item>
         <el-menu-item index="/dashboard">数据看板</el-menu-item>
+        <el-menu-item index="/music">背景音乐</el-menu-item>
         <el-menu-item index="/profile">个人中心</el-menu-item>
       </el-menu>
     </el-drawer>
@@ -77,10 +82,11 @@
 <script>
 import { mapGetters } from 'vuex'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import MusicPlayer from '@/components/practice/MusicPlayer.vue'
 
 export default {
   name: 'DefaultLayout',
-  components: { ThemeToggle },
+  components: { ThemeToggle, MusicPlayer },
   data() {
     return {
       drawerVisible: false,
@@ -95,6 +101,7 @@ export default {
       if (path.startsWith('/library')) return '/library'
       if (path.startsWith('/collections')) return '/collections'
       if (path.startsWith('/dashboard')) return '/dashboard'
+      if (path.startsWith('/music')) return '/music'
       if (path.startsWith('/profile')) return '/profile'
       return path
     }
