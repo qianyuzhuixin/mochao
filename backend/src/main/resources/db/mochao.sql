@@ -466,6 +466,7 @@ CREATE TABLE t_music (
     file_path   VARCHAR(500)    NOT NULL                 COMMENT '文件路径(相对music-dir)',
     file_size   BIGINT          DEFAULT 0                COMMENT '文件大小(字节)',
     duration    INT             DEFAULT 0                COMMENT '时长(秒)',
+    favorite    TINYINT         DEFAULT 0                COMMENT '是否收藏(0=否,1=是)',
     created_at  DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at  DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),

@@ -176,11 +176,14 @@ export default {
   .header-left {
     display: flex;
     align-items: center;
-    gap: #{$spacing-xl};
+    gap: #{$spacing-md};
+    flex: 1;
+    min-width: 0;
   }
 
   .logo {
     cursor: pointer;
+    flex-shrink: 0;
 
     .logo-text {
       font-size: $font-size-xl;
@@ -192,12 +195,18 @@ export default {
 
   .header-menu {
     border-bottom: none;
+    flex-shrink: 0;
+
+    ::v-deep .el-menu-item {
+      font-size: 16px;
+    }
   }
 
   .header-right {
     display: flex;
     align-items: center;
-    gap: #{$spacing-md};
+    gap: #{$spacing-sm};
+    flex-shrink: 0;
 
     .user-info {
       display: flex;
@@ -208,7 +217,7 @@ export default {
 
       .username {
         font-size: $font-size-base;
-        max-width: 120px;
+        max-width: 80px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

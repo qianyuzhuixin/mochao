@@ -28,24 +28,48 @@
         :disabled="!hasTrack"
         @click="handleNext"
       />
+
+      <!-- 播放模式 -->
+      <el-tooltip :content="playModeLabel" placement="bottom" :open-delay="300">
+        <el-button
+          :icon="playModeIcon"
+          size="mini"
+          circle
+          :type="playMode === 'favorite' ? 'warning' : 'default'"
+          :disabled="!hasTrack"
+          @click="handleCycleMode"
+        />
+      </el-tooltip>
     </div>
 
-    <!-- 当前曲目 -->
+    <!-- 当前曲目 + 进度 -->
     <div class="player-track-info">
       <el-popover
         placement="top"
         trigger="click"
-        width="280"
+        width="300"
         popper-class="music-playlist-popover"
       >
         <div class="playlist-panel">
           <div class="playlist-header">
-            <span>我的音乐库</span>
+            <span>播放列表</span>
+            <div class="playlist-tabs">
+              <span
+                class="tab"
+                :class="{ active: listFilter === 'all' }"
+                @click="listFilter = 'all'"
+              >全部 {{ musicList.length }}</span>
+              <span
+                class="tab"
+                :class="{ active: listFilter === 'favorite' }"
+                @click="listFilter = 'favorite'"
+              >收藏 {{ favoriteCount }}</span>
+            </div>
             <el-button type="text" size="mini" @click="goToManager">管理</el-button>
           </div>
-          <div class="playlist-body" v-if="musicList.length > 0">
+          <div class="playlist-body" v-if="displayList.length > 0">
             <div
-              v-for="track in musicList"
+              v-for="track in displayList"
               :key="track.id"
               class="playlist-item"
               :class="{ active: currentTrack && currentTrack.id === track.id }"
@@ -61,12 +85,18 @@
                 <span class="track-title">{{ track.title }}</span>
                 <span v-if="track.artist" class="track-artist">{{ track.artist }}</span>
               </div>
-              <span class="track-size">{{ formatSize(track.fileSize) }}</span>
+              <i
+                class="fav-icon"
+                :class="track.favorite === 1 ? 'el-icon-star-on' : 'el-icon-star-off'"
+                @click.stop="handleToggleFavorite(track)"
+              />
             </div>
           </div>
           <div v-else class="playlist-empty">
-            <p>还没有音乐，快去添加吧</p>
-            <el-button type="primary" size="small" @click="goToManager">添加音乐</el-button>
+            <p>{{ listFilter === 'favorite' ? '还没有收藏音乐' : '还没有音乐，快去添加吧' }}</p>
+            <el-button type="primary" size="small" @click="goToManager">
+              {{ listFilter === 'favorite' ? '去收藏' : '添加音乐' }}
+            </el-button>
           </div>
         </div>
         <span slot="reference" class="track-display">
@@ -76,6 +106,21 @@
           <i class="el-icon-arrow-up" />
         </span>
       </el-popover>
+
+      <!-- 进度条 + 时间 -->
+      <div class="progress-section" v-if="hasTrack">
+        <span class="time-display">{{ formatTime(currentTime) }}</span>
+        <el-slider
+          v-model="progressPercent"
+          :min="0"
+          :max="100"
+          :step="0.1"
+          :show-tooltip="false"
+          class="progress-slider"
+          @change="handleSeek"
+        />
+        <span class="time-display">{{ formatTime(duration) }}</span>
+      </div>
     </div>
 
     <!-- 音量 -->
@@ -102,6 +147,8 @@
       @pause="onAudioPause"
       @ended="onAudioEnded"
       @error="onAudioError"
+      @timeupdate="onTimeUpdate"
+      @loadedmetadata="onLoadedMetadata"
     />
   </div>
 </template>
@@ -117,11 +164,38 @@ export default {
     return {
       localVolume: 60,
       previousVolume: 60,
-      audioLoaded: false
+      audioLoaded: false,
+      currentTime: 0,
+      duration: 0,
+      progressPercent: 0,
+      seeking: false,
+      listFilter: 'all'
     }
   },
   computed: {
-    ...mapGetters('music', ['musicList', 'currentTrack', 'isPlaying', 'volume', 'hasTrack'])
+    ...mapGetters('music', [
+      'musicList', 'favoriteList', 'currentTrack', 'isPlaying',
+      'volume', 'hasTrack', 'playMode', 'activeList'
+    ]),
+    playModeIcon() {
+      if (this.playMode === 'shuffle') return 'el-icon-s-operation'
+      if (this.playMode === 'favorite') return 'el-icon-star-on'
+      return 'el-icon-sort'
+    },
+    playModeLabel() {
+      if (this.playMode === 'shuffle') return '乱序播放'
+      if (this.playMode === 'favorite') return '收藏播放'
+      return '顺序播放'
+    },
+    favoriteCount() {
+      return this.musicList.filter(m => m.favorite === 1).length
+    },
+    displayList() {
+      if (this.listFilter === 'favorite') {
+        return this.musicList.filter(m => m.favorite === 1)
+      }
+      return this.musicList
+    }
   },
   watch: {
     currentTrack: {
@@ -152,7 +226,8 @@ export default {
   },
   async created() {
     await this.fetchMusicList()
-    // 恢复上次播放
+    await this.fetchFavoriteMusic()
+
     const savedTrackId = localStorage.getItem('mochao_music_track_id')
     if (savedTrackId && this.musicList.length > 0) {
       const track = this.musicList.find(m => m.id === parseInt(savedTrackId))
@@ -165,11 +240,12 @@ export default {
     this.destroyAudio()
   },
   methods: {
-    ...mapActions('music', ['fetchMusicList', 'playNext', 'playPrev', 'togglePlay']),
+    ...mapActions('music', [
+      'fetchMusicList', 'fetchFavoriteMusic', 'playNext', 'playPrev',
+      'togglePlay', 'cyclePlayMode', 'toggleFavoriteTrack'
+    ]),
 
     getFileUrl(track) {
-      // 使用音乐 ID 而非文件路径构建 URL，
-      // 避免 URL 中出现 .mp3 等扩展名被 IDM 等下载器拦截
       return `${BASE_API}/files/music/${track.id}`
     },
 
@@ -183,13 +259,14 @@ export default {
       audio.load()
 
       this.audioLoaded = true
-      localStorage.setItem('mochao_music_track_id', track.id)
+      this.currentTime = 0
+      this.duration = track.duration || 0
+      this.progressPercent = 0
 
       if (this.isPlaying) {
         audio.play().catch(() => {})
       }
 
-      // 更新浏览器媒体会话（支持媒体键控制）
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: track.title,
@@ -222,17 +299,40 @@ export default {
       this.playNext()
     },
 
+    handleCycleMode() {
+      const mode = this.cyclePlayMode()
+      const labels = {
+        sequence: '顺序播放',
+        shuffle: '乱序播放',
+        favorite: '收藏播放'
+      }
+      this.$message({
+        message: labels[mode],
+        duration: 1500,
+        type: 'info'
+      })
+    },
+
+    async handleToggleFavorite(track) {
+      try {
+        const favorite = await this.toggleFavoriteTrack(track.id)
+        this.$message({
+          message: favorite === 1 ? '已收藏' : '已取消收藏',
+          duration: 1200,
+          type: 'success'
+        })
+      } catch {
+        this.$message.error('操作失败')
+      }
+    },
+
     handleSelectTrack(track) {
       if (this.currentTrack && this.currentTrack.id === track.id) {
         this.handleTogglePlay()
       } else {
-        this.playTrack(track)
+        this.$store.commit('music/SET_CURRENT_TRACK', track)
+        this.$store.commit('music/SET_PLAYING', true)
       }
-    },
-
-    playTrack(track) {
-      this.$store.commit('music/SET_CURRENT_TRACK', track)
-      this.$store.commit('music/SET_PLAYING', true)
     },
 
     handleVolume(val) {
@@ -259,9 +359,7 @@ export default {
     },
 
     onAudioPause() {
-      if (this.$refs.audio && !this.$refs.audio.ended) {
-        // 只在非结束状态手动暂停时更新
-      }
+      // 非 ended 状态的暂停由 Vuex 控制
     },
 
     onAudioEnded() {
@@ -271,6 +369,36 @@ export default {
     onAudioError() {
       this.$message.warning('音乐文件加载失败，请尝试重新上传')
       this.destroyAudio()
+    },
+
+    onTimeUpdate() {
+      if (this.seeking) return
+      const audio = this.$refs.audio
+      if (!audio) return
+      this.currentTime = audio.currentTime
+      if (audio.duration && !isNaN(audio.duration)) {
+        this.duration = audio.duration
+      }
+      this.progressPercent = this.duration > 0
+        ? (this.currentTime / this.duration) * 100
+        : 0
+    },
+
+    onLoadedMetadata() {
+      const audio = this.$refs.audio
+      if (!audio) return
+      if (audio.duration && !isNaN(audio.duration)) {
+        this.duration = audio.duration
+      }
+    },
+
+    handleSeek(val) {
+      const audio = this.$refs.audio
+      if (!audio || !this.duration) return
+      this.seeking = false
+      const newTime = (val / 100) * this.duration
+      audio.currentTime = newTime
+      this.currentTime = newTime
     },
 
     goToManager() {
@@ -286,10 +414,11 @@ export default {
       this.audioLoaded = false
     },
 
-    formatSize(bytes) {
-      if (!bytes) return '--'
-      if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB'
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+    formatTime(seconds) {
+      if (!seconds || isNaN(seconds)) return '0:00'
+      const m = Math.floor(seconds / 60)
+      const s = Math.floor(seconds % 60)
+      return `${m}:${String(s).padStart(2, '0')}`
     }
   }
 }
@@ -299,10 +428,10 @@ export default {
 .music-player-bar {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 18px;
+  gap: 6px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 19px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   transition: border-color 0.25s, box-shadow 0.25s;
@@ -325,21 +454,30 @@ export default {
 
   .player-track-info {
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 
     .track-display {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       cursor: pointer;
       color: var(--color-text);
       font-size: $font-size-sm;
-      max-width: 160px;
+      max-width: 110px;
+
+      .el-icon-headset {
+        width: 32px;
+        text-align: center;
+        flex-shrink: 0;
+      }
 
       .track-name {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 120px;
+        max-width: 70px;
       }
 
       .track-placeholder {
@@ -350,6 +488,41 @@ export default {
       .el-icon-arrow-up {
         font-size: $font-size-xs;
         color: var(--color-text-placeholder);
+      }
+    }
+
+    .progress-section {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 16px;
+
+      .time-display {
+        font-size: 10px;
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+        min-width: 32px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .progress-slider {
+        width: 80px;
+        margin: 0 !important;
+
+        ::v-deep .el-slider__runway {
+          height: 3px;
+          margin: 0;
+        }
+
+        ::v-deep .el-slider__bar {
+          height: 3px;
+          background: var(--color-primary);
+        }
+
+        ::v-deep .el-slider__button-wrapper {
+          display: none;
+        }
       }
     }
   }
@@ -376,7 +549,7 @@ export default {
     }
 
     .volume-slider {
-      width: 60px;
+      width: 50px;
     }
   }
 }
@@ -397,7 +570,7 @@ export default {
 <style lang="scss">
 .music-playlist-popover {
   padding: 0 !important;
-  max-height: 360px;
+  max-height: 400px;
   overflow: hidden;
 
   .playlist-panel {
@@ -408,10 +581,36 @@ export default {
       padding: 10px 14px 6px;
       font-weight: 600;
       border-bottom: 1px solid var(--color-border);
+      gap: 8px;
+
+      .playlist-tabs {
+        display: flex;
+        gap: 6px;
+        margin-left: auto;
+
+        .tab {
+          font-size: 12px;
+          font-weight: 400;
+          color: var(--color-text-secondary);
+          cursor: pointer;
+          padding: 2px 8px;
+          border-radius: 10px;
+          transition: all 0.2s;
+
+          &:hover {
+            background: var(--color-bg);
+          }
+
+          &.active {
+            color: var(--color-primary);
+            background: rgba(64, 158, 255, 0.1);
+          }
+        }
+      }
     }
 
     .playlist-body {
-      max-height: 280px;
+      max-height: 300px;
       overflow-y: auto;
     }
 
@@ -463,10 +662,20 @@ export default {
         }
       }
 
-      .track-size {
-        font-size: 11px;
+      .fav-icon {
+        font-size: 16px;
         color: var(--color-text-placeholder);
+        cursor: pointer;
         flex-shrink: 0;
+        transition: color 0.2s, transform 0.15s;
+
+        &:hover {
+          transform: scale(1.2);
+        }
+
+        &.el-icon-star-on {
+          color: #e6a23c;
+        }
       }
     }
 

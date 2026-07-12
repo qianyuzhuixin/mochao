@@ -26,6 +26,20 @@ public class MusicController {
         return Result.success(musicService.getMusicList(page, size, userId));
     }
 
+    @GetMapping("/favorites")
+    public Result<Page<Music>> favorites(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(musicService.getFavoriteMusicList(page, size, userId));
+    }
+
+    @PostMapping("/{id}/favorite")
+    public Result<Music> toggleFavorite(@PathVariable Long id) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(musicService.toggleFavorite(id, userId));
+    }
+
     @PostMapping("/upload")
     public Result<Music> upload(
             @RequestParam("file") MultipartFile file,

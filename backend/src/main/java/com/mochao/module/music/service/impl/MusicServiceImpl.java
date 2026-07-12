@@ -1,6 +1,7 @@
 package com.mochao.module.music.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mochao.common.exception.BusinessException;
 import com.mochao.common.result.ResultCode;
@@ -35,6 +36,15 @@ public class MusicServiceImpl implements MusicService {
     public Page<Music> getMusicList(int page, int size, Long userId) {
         LambdaQueryWrapper<Music> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Music::getUserId, userId)
+               .orderByDesc(Music::getCreatedAt);
+        return musicMapper.selectPage(new Page<>(page, size), wrapper);
+    }
+
+    @Override
+    public Page<Music> getFavoriteMusicList(int page, int size, Long userId) {
+        LambdaQueryWrapper<Music> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Music::getUserId, userId)
+               .eq(Music::getFavorite, 1)
                .orderByDesc(Music::getCreatedAt);
         return musicMapper.selectPage(new Page<>(page, size), wrapper);
     }
@@ -101,6 +111,26 @@ public class MusicServiceImpl implements MusicService {
 
         // 删除数据库记录
         musicMapper.deleteById(id);
+    }
+
+    @Override
+    public Music toggleFavorite(Long id, Long userId) {
+        Music music = musicMapper.selectById(id);
+        if (music == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "音乐文件不存在");
+        }
+        if (!userId.equals(music.getUserId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权操作此音乐");
+        }
+
+        int newFavorite = (music.getFavorite() != null && music.getFavorite() == 1) ? 0 : 1;
+        musicMapper.update(null, new LambdaUpdateWrapper<Music>()
+                .eq(Music::getId, id)
+                .set(Music::getFavorite, newFavorite)
+                .set(Music::getUpdatedAt, LocalDateTime.now()));
+
+        music.setFavorite(newFavorite);
+        return music;
     }
 
     private String getFileExtension(String filename) {

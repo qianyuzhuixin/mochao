@@ -28,6 +28,9 @@ public class Music {
 
     private Integer duration;
 
+    /** 是否收藏（0=否, 1=是） */
+    private Integer favorite;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

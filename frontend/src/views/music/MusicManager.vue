@@ -139,6 +139,24 @@
           />
         </div>
 
+        <!-- 筛选标签 -->
+        <div v-if="musicList.length > 0" class="filter-tabs">
+          <span
+            class="filter-tab"
+            :class="{ active: listFilter === 'all' }"
+            @click="listFilter = 'all'"
+          >
+            <i class="el-icon-menu" /> 全部 ({{ musicList.length }})
+          </span>
+          <span
+            class="filter-tab"
+            :class="{ active: listFilter === 'favorite' }"
+            @click="listFilter = 'favorite'"
+          >
+            <i class="el-icon-star-on" /> 收藏 ({{ favoriteCount }})
+          </span>
+        </div>
+
         <!-- Loading -->
         <div v-if="loading" class="loading-state">
           <div class="loading-spin">
@@ -148,18 +166,18 @@
         </div>
 
         <!-- Empty -->
-        <div v-else-if="musicList.length === 0" class="empty-state">
+        <div v-else-if="filteredList.length === 0" class="empty-state">
           <div class="empty-illustration">
-            <i class="el-icon-headset" />
+            <i :class="listFilter === 'favorite' ? 'el-icon-star-off' : 'el-icon-headset'" />
           </div>
-          <div class="empty-title">还没有音乐</div>
-          <div class="empty-desc">上传你的第一首曲目，为写作时光增添氛围</div>
+          <div class="empty-title">{{ listFilter === 'favorite' ? '还没有收藏音乐' : '还没有音乐' }}</div>
+          <div class="empty-desc">{{ listFilter === 'favorite' ? '在列表中点击星星收藏喜欢的音乐' : '上传你的第一首曲目，为写作时光增添氛围' }}</div>
         </div>
 
         <!-- List -->
         <div v-else class="music-list">
           <div
-            v-for="row in musicList"
+            v-for="row in filteredList"
             :key="row.id"
             class="music-row"
             :class="{ active: isCurrentTrack(row) }"
@@ -182,6 +200,14 @@
               </div>
             </div>
             <div class="row-actions" @click.stop>
+              <el-button
+                :type="row.favorite === 1 ? 'warning' : 'default'"
+                size="mini"
+                :icon="row.favorite === 1 ? 'el-icon-star-on' : 'el-icon-star-off'"
+                circle
+                plain
+                @click="handleToggleFavorite(row)"
+              />
               <el-button
                 type="danger"
                 size="mini"
@@ -211,6 +237,7 @@ export default {
       loading: false,
       uploading: false,
       pendingFile: null,
+      listFilter: 'all',
       uploadForm: {
         title: '',
         artist: ''
@@ -227,13 +254,22 @@ export default {
     },
     totalDuration() {
       return this.musicList.reduce((sum, m) => sum + (m.duration || 0), 0)
+    },
+    favoriteCount() {
+      return this.musicList.filter(m => m.favorite === 1).length
+    },
+    filteredList() {
+      if (this.listFilter === 'favorite') {
+        return this.musicList.filter(m => m.favorite === 1)
+      }
+      return this.musicList
     }
   },
   created() {
     this.loadMusicList()
   },
   methods: {
-    ...mapActions('music', ['fetchMusicList']),
+    ...mapActions('music', ['fetchMusicList', 'fetchFavoriteMusic', 'toggleFavoriteTrack']),
 
     async loadMusicList() {
       this.loading = true
@@ -281,6 +317,19 @@ export default {
       } else {
         this.$store.commit('music/SET_CURRENT_TRACK', track)
         this.$store.commit('music/SET_PLAYING', true)
+      }
+    },
+
+    async handleToggleFavorite(row) {
+      try {
+        const favorite = await this.toggleFavoriteTrack(row.id)
+        this.$message({
+          message: favorite === 1 ? '已收藏' : '已取消收藏',
+          duration: 1200,
+          type: 'success'
+        })
+      } catch {
+        this.$message.error('操作失败')
       }
     },
 
@@ -650,6 +699,37 @@ export default {
 
 /* ====== Music List ====== */
 .music-list-section {
+  .filter-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+
+    .filter-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-border);
+      padding: 4px 14px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+      }
+
+      &.active {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: #fff;
+      }
+    }
+  }
+
   .loading-state {
     display: flex;
     flex-direction: column;
@@ -793,6 +873,9 @@ export default {
       }
 
       .row-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
         opacity: 0;
         transition: opacity 0.2s;
         flex-shrink: 0;

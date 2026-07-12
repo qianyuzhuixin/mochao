@@ -8,6 +8,21 @@ export function getMusicList(page = 1, size = 20) {
   })
 }
 
+export function getFavoriteMusic(page = 1, size = 100) {
+  return request({
+    url: '/music/favorites',
+    method: 'get',
+    params: { page, size }
+  })
+}
+
+export function toggleFavorite(id) {
+  return request({
+    url: `/music/${id}/favorite`,
+    method: 'post'
+  })
+}
+
 export function uploadMusic(file, title, artist) {
   const formData = new FormData()
   formData.append('file', file)
