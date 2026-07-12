@@ -137,7 +137,6 @@
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { getOverview, getTrend, getCheckIn, getCalendar } from '@/api/statistics'
 import { getPracticeHistory } from '@/api/practice'
-import echarts from 'echarts'
 
 export default {
   name: 'Dashboard',
@@ -180,14 +179,19 @@ export default {
       this.loading = true
       try {
         const [overview, calendarRes] = await Promise.all([
-          getOverview().catch(() => ({})),
+          getOverview().catch(() => null),
           getCalendar({ year: this.currentYear, month: this.currentMonth }).catch(() => null)
         ])
         this.overview = overview || {}
+
+        // 使用后端真实数据，不再生成假数据
         const backendCalendar = calendarRes && calendarRes.calendar ? calendarRes.calendar : []
-        this.calendarData = backendCalendar.length > 0 ? backendCalendar : this.generateCalendar()
+        this.calendarData = backendCalendar
+
         this.fetchHistory()
-      } catch (e) {} finally {
+      } catch (e) {
+        console.error('Dashboard fetchData error:', e)
+      } finally {
         this.loading = false
       }
     },
@@ -201,17 +205,9 @@ export default {
       }
     },
     generateCalendar() {
-      const days = []
-      const now = new Date()
-      for (let i = 90; i >= 0; i--) {
-        const d = new Date(now)
-        d.setDate(d.getDate() - i)
-        days.push({
-          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-          totalChars: Math.random() > 0.4 ? Math.floor(Math.random() * 3000) : 0
-        })
-      }
-      return days
+      // 【已废弃】不再生成假数据，改为从后端 API 获取真实日历数据
+      // 如果后端未返回数据，日历将显示为空白（均为 0 字）
+      return []
     },
     changeMonth(delta) {
       let newMonth = this.currentMonth + delta
@@ -290,25 +286,46 @@ export default {
         this.$message.success('打卡成功')
         this.overview.checkedIn = true
         this.overview.streakDays = res.streakDays || this.overview.streakDays
-      } catch (e) {}
+      } catch (e) {
+        console.error('打卡失败:', e)
+      }
     },
-    initTrendChart() {
+    async initTrendChart() {
       const el = this.$refs.trendChart
       if (!el) return
-      this.trendChart = echarts.init(el)
+      this.trendChart = this.$echarts.init(el)
+
+      // 从后端获取真实趋势数据
+      let trendData = null
+      try {
+        trendData = await getTrend()
+      } catch (e) {
+        console.error('趋势数据加载失败:', e)
+      }
 
       const days = []
       const wordData = []
       const accuracyData = []
       const speedData = []
-      const now = new Date()
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date(now)
-        d.setDate(d.getDate() - i)
-        days.push(`${d.getMonth() + 1}/${d.getDate()}`)
-        wordData.push(Math.floor(Math.random() * 3000) + 500)
-        accuracyData.push(Math.floor(Math.random() * 20) + 80)
-        speedData.push(Math.floor(Math.random() * 50) + 50)
+
+      if (trendData && trendData.days && trendData.days.length > 0) {
+        // 使用后端真实数据
+        trendData.days.forEach((item, i) => {
+          days.push(item.date || `第${i + 1}天`)
+          wordData.push(item.totalChars || 0)
+          accuracyData.push(item.accuracy || 0)
+          speedData.push(item.speed || 0)
+        })
+      } else {
+        // 后端无数据时显示空图表（不再生成假数据）
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date()
+          d.setDate(d.getDate() - i)
+          days.push(`${d.getMonth() + 1}/${d.getDate()}`)
+          wordData.push(0)
+          accuracyData.push(0)
+          speedData.push(0)
+        }
       }
 
       this.trendChart.setOption({

@@ -1,6 +1,7 @@
 package com.mochao.module.novel.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mochao.common.constant.Constants;
 import com.mochao.common.exception.BusinessException;
@@ -10,6 +11,7 @@ import com.mochao.module.novel.entity.*;
 import com.mochao.module.novel.mapper.*;
 import com.mochao.module.novel.service.NovelService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
@@ -101,6 +103,7 @@ public class NovelServiceImpl implements NovelService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteNovel(Long id, Long userId) {
         Novel novel = getOwnedNovel(id, userId);
         // 删除关联数据
@@ -395,6 +398,7 @@ public class NovelServiceImpl implements NovelService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public NovelChapter createChapter(Long novelId, NovelChapterDTO dto, Long userId) {
         getOwnedNovel(novelId, userId);
         NovelChapter chapter = new NovelChapter();
@@ -403,29 +407,34 @@ public class NovelServiceImpl implements NovelService {
         chapter.setChapterNumber(dto.getChapterNumber());
         chapter.setTitle(dto.getTitle());
         chapter.setContent(dto.getContent());
-        chapter.setWordCount(dto.getContent() != null ? dto.getContent().length() : 0);
+        // 字数统计：去除空白字符后统计（中英文混排更准确）
+        String content = dto.getContent();
+        int wordCount = content != null ? content.replaceAll("\\s+", "").length() : 0;
+        chapter.setWordCount(wordCount);
         chapter.setStatus(dto.getStatus() != null ? dto.getStatus() : Constants.CHAPTER_STATUS_DRAFT);
         chapter.setCreatedAt(LocalDateTime.now());
         chapter.setUpdatedAt(LocalDateTime.now());
         novelChapterMapper.insert(chapter);
 
-        // 更新小说统计
-        Novel novel = novelMapper.selectById(novelId);
-        novel.setChapterCount(novel.getChapterCount() + 1);
-        novel.setTotalWords(novel.getTotalWords() + chapter.getWordCount());
+        // 原子更新小说统计（解决并发竞态条件）
+        LambdaUpdateWrapper<Novel> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Novel::getId, novelId)
+                .setSql("chapter_count = chapter_count + 1")
+                .setSql("total_words = total_words + " + wordCount);
         if (Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus())) {
-            novel.setCompletedChapters(novel.getCompletedChapters() + 1);
+            updateWrapper.setSql("completed_chapters = completed_chapters + 1");
         }
-        novel.setUpdatedAt(LocalDateTime.now());
-        novelMapper.updateById(novel);
+        updateWrapper.set(Novel::getUpdatedAt, LocalDateTime.now());
+        novelMapper.update(null, updateWrapper);
 
         // 更新每日进度
-        updateDailyProgress(novelId, userId, chapter.getWordCount());
+        updateDailyProgress(novelId, userId, wordCount);
 
         return chapter;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public NovelChapter updateChapter(Long chapterId, NovelChapterDTO dto, Long userId) {
         NovelChapter chapter = novelChapterMapper.selectById(chapterId);
         if (chapter == null) {
@@ -441,29 +450,33 @@ public class NovelServiceImpl implements NovelService {
         if (dto.getTitle() != null) chapter.setTitle(dto.getTitle());
         if (dto.getContent() != null) {
             chapter.setContent(dto.getContent());
-            chapter.setWordCount(dto.getContent().length());
+            chapter.setWordCount(dto.getContent().replaceAll("\\s+", "").length());
         }
         if (dto.getStatus() != null) chapter.setStatus(dto.getStatus());
         chapter.setUpdatedAt(LocalDateTime.now());
         novelChapterMapper.updateById(chapter);
 
-        // 更新小说统计
-        Novel novel = novelMapper.selectById(chapter.getNovelId());
+        // 原子更新小说统计（解决并发竞态条件）
         int newWordCount = chapter.getWordCount() != null ? chapter.getWordCount() : 0;
-        novel.setTotalWords(novel.getTotalWords() - oldWordCount + newWordCount);
+        int wordDelta = newWordCount - oldWordCount;
         boolean nowPublished = Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus());
+
+        LambdaUpdateWrapper<Novel> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Novel::getId, chapter.getNovelId())
+                .setSql("total_words = total_words + " + wordDelta);
         if (nowPublished && !wasPublished) {
-            novel.setCompletedChapters(novel.getCompletedChapters() + 1);
+            updateWrapper.setSql("completed_chapters = completed_chapters + 1");
         } else if (!nowPublished && wasPublished) {
-            novel.setCompletedChapters(novel.getCompletedChapters() - 1);
+            updateWrapper.setSql("completed_chapters = completed_chapters - 1");
         }
-        novel.setUpdatedAt(LocalDateTime.now());
-        novelMapper.updateById(novel);
+        updateWrapper.set(Novel::getUpdatedAt, LocalDateTime.now());
+        novelMapper.update(null, updateWrapper);
 
         return chapter;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteChapter(Long chapterId, Long userId) {
         NovelChapter chapter = novelChapterMapper.selectById(chapterId);
         if (chapter == null) {
@@ -471,15 +484,19 @@ public class NovelServiceImpl implements NovelService {
         }
         getOwnedNovel(chapter.getNovelId(), userId);
 
-        // 更新小说统计
-        Novel novel = novelMapper.selectById(chapter.getNovelId());
-        novel.setChapterCount(novel.getChapterCount() - 1);
-        novel.setTotalWords(novel.getTotalWords() - (chapter.getWordCount() != null ? chapter.getWordCount() : 0));
-        if (Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus())) {
-            novel.setCompletedChapters(novel.getCompletedChapters() - 1);
+        int wordCount = chapter.getWordCount() != null ? chapter.getWordCount() : 0;
+        boolean wasPublished = Constants.CHAPTER_STATUS_PUBLISHED.equals(chapter.getStatus());
+
+        // 原子更新小说统计（解决并发竞态条件）
+        LambdaUpdateWrapper<Novel> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Novel::getId, chapter.getNovelId())
+                .setSql("chapter_count = chapter_count - 1")
+                .setSql("total_words = total_words - " + wordCount);
+        if (wasPublished) {
+            updateWrapper.setSql("completed_chapters = completed_chapters - 1");
         }
-        novel.setUpdatedAt(LocalDateTime.now());
-        novelMapper.updateById(novel);
+        updateWrapper.set(Novel::getUpdatedAt, LocalDateTime.now());
+        novelMapper.update(null, updateWrapper);
 
         novelChapterMapper.deleteById(chapterId);
     }

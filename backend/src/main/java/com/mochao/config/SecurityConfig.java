@@ -39,6 +39,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            // JWT 无状态认证，不使用 Cookie 传递凭据，因此禁用 CSRF 是安全的
             .csrf().disable()
             .cors()
             .and()

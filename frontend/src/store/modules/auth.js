@@ -51,7 +51,7 @@ const actions = {
 
 const getters = {
   isLoggedIn: state => !!state.token,
-  isAdmin: state => state.userInfo && state.userInfo.role === 'admin',
+  isAdmin: state => state.userInfo && state.userInfo.role === 'ADMIN',
   userInfo: state => state.userInfo
 }
 

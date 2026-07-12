@@ -132,8 +132,8 @@ export default {
         const novel = await getNovelById(this.novelId)
         this.novel = novel
 
-        // 并行获取进度和章节，互不阻塞
-        Promise.all([
+        // 并行获取进度和章节，等待两者完成后再结束 loading
+        await Promise.all([
           getNovelProgress(this.novelId).then(res => {
             this.progressData = res || {}
           }).catch(() => {

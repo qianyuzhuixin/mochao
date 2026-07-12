@@ -32,6 +32,12 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     NProgress.done()
+
+    // Blob 响应（如文件导出）直接返回，不走 JSON 解析
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
+
     const res = response.data
 
     if (res.code === 200) {

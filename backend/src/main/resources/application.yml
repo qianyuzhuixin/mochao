@@ -24,7 +24,7 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: mochao-secret-key-2024-very-long-secret-key-for-jwt
+  secret: ${JWT_SECRET:}
   expiration: 86400000
 
 # ==================== AI 写作配置 ====================
@@ -36,15 +36,14 @@ jwt:
 # 方案三：使用其他兼容 API（Moonshot/阿里百炼/硅基流动等）
 # ======================================================
 ai:
-  provider: openai
-  api-url: https://api.openai.com/v1/chat/completions
-  api-key: your-api-key-here
-  model: gpt-3.5-turbo
-  max-tokens: 2000
-  temperature: 0.8
-  # HTTP 代理（访问 OpenAI 需要，不配则直连）
-  proxy-host: ''
-  proxy-port: 0
+  provider: ${AI_PROVIDER:openai}
+  api-url: ${AI_API_URL:https://api.openai.com/v1/chat/completions}
+  api-key: ${AI_API_KEY:}
+  model: ${AI_MODEL:gpt-3.5-turbo}
+  max-tokens: ${AI_MAX_TOKENS:2000}
+  temperature: ${AI_TEMPERATURE:0.8}
+  proxy-host: ${AI_PROXY_HOST:}
+  proxy-port: ${AI_PROXY_PORT:0}
 
 springdoc:
   swagger-ui:

@@ -1,7 +1,8 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
 import NProgress from 'nprogress'
-import { getToken, getUserInfo } from '@/utils/auth'
+import { getToken } from '@/utils/auth'
+import store from '@/store'
 
 Vue.use(VueRouter)
 
@@ -219,7 +220,6 @@ router.beforeEach((to, from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - 墨抄` : DEFAULT_TITLE
 
   const token = getToken()
-  const userInfo = getUserInfo()
 
   // 已登录访问登录/注册页，跳转首页
   if (token && (to.path === '/login' || to.path === '/register')) {
@@ -233,9 +233,9 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  // 需要管理员权限
+  // 需要管理员权限（统一从 Vuex store 读取，避免 localStorage 角色判断不一致）
   if (to.meta.requiresAdmin) {
-    if (!token || !userInfo || userInfo.role !== 'ADMIN') {
+    if (!token || !store.getters['auth/isAdmin']) {
       next('/admin/login')
       return
     }

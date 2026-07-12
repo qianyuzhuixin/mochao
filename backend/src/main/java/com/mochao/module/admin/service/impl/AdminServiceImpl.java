@@ -22,6 +22,7 @@ import com.mochao.module.novel.mapper.NovelMapper;
 import com.mochao.module.practice.entity.PracticeSession;
 import com.mochao.module.practice.mapper.PracticeSessionMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -134,6 +135,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Book createBook(BookCreateDTO dto, Long adminId) {
         Book book = new Book();
         book.setTitle(dto.getTitle());
@@ -161,6 +163,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Book updateBook(Long id, BookCreateDTO dto, Long adminId) {
         Book book = bookMapper.selectById(id);
         if (book == null) {
@@ -187,6 +190,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteBook(Long id, Long adminId) {
         Book book = bookMapper.selectById(id);
         if (book == null) {
@@ -198,6 +202,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Integer importBooks(List<BookCreateDTO> books, Long adminId) {
         int count = 0;
         for (BookCreateDTO dto : books) {

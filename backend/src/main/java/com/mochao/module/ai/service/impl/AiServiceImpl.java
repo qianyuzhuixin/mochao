@@ -40,6 +40,7 @@ public class AiServiceImpl implements AiService {
     private final NovelCharacterMapper novelCharacterMapper;
     private final NovelChapterMapper novelChapterMapper;
     private final AiConfigService aiConfigService;
+    private final RestTemplate restTemplate;
 
     /** application.yml 兜底配置 */
     @Value("${ai.api-url}")
@@ -69,7 +70,8 @@ public class AiServiceImpl implements AiService {
                          NovelWorldviewMapper novelWorldviewMapper,
                          NovelCharacterMapper novelCharacterMapper,
                          NovelChapterMapper novelChapterMapper,
-                         AiConfigService aiConfigService) {
+                         AiConfigService aiConfigService,
+                         RestTemplate restTemplate) {
         this.aiUsageLogMapper = aiUsageLogMapper;
         this.novelMapper = novelMapper;
         this.novelOutlineMapper = novelOutlineMapper;
@@ -77,6 +79,7 @@ public class AiServiceImpl implements AiService {
         this.novelCharacterMapper = novelCharacterMapper;
         this.novelChapterMapper = novelChapterMapper;
         this.aiConfigService = aiConfigService;
+        this.restTemplate = restTemplate;
     }
 
     @Override
@@ -236,6 +239,18 @@ public class AiServiceImpl implements AiService {
         return new RestTemplate(factory);
     }
 
+    /**
+     * 判断用户自定义的代理配置是否与全局默认配置不同
+     * 相同则复用全局 RestTemplate Bean，避免频繁创建
+     */
+    private boolean isCustomProxy(AiRuntimeConfig cfg) {
+        String cfgHost = cfg.proxyHost != null ? cfg.proxyHost : "";
+        int cfgPort = cfg.proxyPort != null ? cfg.proxyPort : 0;
+        String defHost = defaultProxyHost != null ? defaultProxyHost : "";
+        int defPort = defaultProxyPort != null ? defaultProxyPort : 0;
+        return !cfgHost.equals(defHost) || cfgPort != defPort;
+    }
+
     // ==================== Private Methods ====================
 
     private String buildUserPrompt(AiRequestDTO dto, String instruction) {
@@ -317,7 +332,10 @@ public class AiServiceImpl implements AiService {
 
     private String callAi(String systemPrompt, String userPrompt, Long userId) {
         AiRuntimeConfig cfg = getRuntimeConfig(userId);
-        RestTemplate rt = buildRestTemplate(cfg.proxyHost, cfg.proxyPort);
+
+        // 如果用户有自定义代理配置（与全局不同），才创建专用 RestTemplate
+        // 否则复用全局 RestTemplate Bean
+        RestTemplate rt = isCustomProxy(cfg) ? buildRestTemplate(cfg.proxyHost, cfg.proxyPort) : this.restTemplate;
 
         try {
             HttpHeaders headers = new HttpHeaders();
