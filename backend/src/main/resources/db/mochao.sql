@@ -454,6 +454,26 @@ PREPARE stmt FROM @sql_session_status; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 
 -- ============================================
+-- 12. 背景音乐表
+-- ============================================
+DROP TABLE IF EXISTS t_music;
+CREATE TABLE t_music (
+    id          BIGINT          NOT NULL AUTO_INCREMENT  COMMENT '主键ID',
+    user_id     BIGINT          NOT NULL                 COMMENT '用户ID',
+    title       VARCHAR(100)    NOT NULL                 COMMENT '曲目标题',
+    artist      VARCHAR(100)    DEFAULT ''               COMMENT '艺术家',
+    file_name   VARCHAR(255)    NOT NULL                 COMMENT '存储文件名(UUID)',
+    file_path   VARCHAR(500)    NOT NULL                 COMMENT '文件路径(相对music-dir)',
+    file_size   BIGINT          DEFAULT 0                COMMENT '文件大小(字节)',
+    duration    INT             DEFAULT 0                COMMENT '时长(秒)',
+    created_at  DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at  DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    INDEX idx_music_user_id (user_id),
+    INDEX idx_music_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='背景音乐';
+
+-- ============================================
 -- 完成
 -- ============================================
 SELECT '墨抄数据库初始化完成！' AS message;
