@@ -49,8 +49,8 @@ public class SecurityConfig {
                 .antMatchers("/v1/auth/**").permitAll()
                 .antMatchers("/swagger-ui/**").permitAll()
                 .antMatchers("/v3/api-docs/**").permitAll()
-                // 音乐文件静态资源公开访问（Audio 元素无法携带 Auth Header）
-                .antMatchers("/files/music/**").permitAll()
+                // 音乐文件流式代理公开访问（Audio 元素无法携带 Auth Header）
+                .antMatchers("/v1/files/music/**").permitAll()
                 .antMatchers("/v1/books/categories").permitAll()
                 .antMatchers(HttpMethod.GET, "/v1/books").permitAll()
                 .antMatchers(HttpMethod.GET, "/v1/books/{id}").permitAll()

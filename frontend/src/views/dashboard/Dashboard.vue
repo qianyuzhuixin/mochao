@@ -104,8 +104,12 @@
       <div class="card-base">
         <h3 class="card-title">练习历史</h3>
         <el-table :data="historyList" style="width: 100%">
-          <el-table-column prop="bookTitle" label="素材" min-width="160" />
-          <el-table-column prop="wordCount" label="字数" width="100" />
+          <el-table-column label="素材" min-width="160">
+            <template #default="{ row }">
+              {{ row.chapterTitle || (row.bookId ? '整本练习' : '-') }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="typedChars" label="字数" width="100" />
           <el-table-column prop="accuracy" label="正确率" width="100">
             <template #default="{ row }">{{ row.accuracy }}%</template>
           </el-table-column>
@@ -197,7 +201,7 @@ export default {
     },
     async fetchHistory() {
       try {
-        const res = await getPracticeHistory({ page: this.historyPage, pageSize: this.pageSize })
+        const res = await getPracticeHistory({ page: this.historyPage, size: this.pageSize })
         this.historyList = res.list || res.records || res || []
         this.historyTotal = res.total || this.historyList.length
       } catch (e) {
@@ -308,13 +312,18 @@ export default {
       const accuracyData = []
       const speedData = []
 
-      if (trendData && trendData.days && trendData.days.length > 0) {
-        // 使用后端真实数据
-        trendData.days.forEach((item, i) => {
-          days.push(item.date || `第${i + 1}天`)
-          wordData.push(item.totalChars || 0)
-          accuracyData.push(item.accuracy || 0)
-          speedData.push(item.speed || 0)
+      if (trendData && trendData.dates && trendData.dates.length > 0) {
+        // 使用后端真实数据（后端返回独立数组：dates / totalChars / avgAccuracies / avgSpeeds）
+        const totalCharsArr = trendData.totalChars || []
+        const avgAccuraciesArr = trendData.avgAccuracies || []
+        const avgSpeedsArr = trendData.avgSpeeds || []
+        trendData.dates.forEach((dateStr, i) => {
+          // 日期格式 "2026-07-01" → "7/1" 更紧凑
+          const parts = dateStr.split('-')
+          days.push(parts.length === 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : dateStr)
+          wordData.push(totalCharsArr[i] || 0)
+          accuracyData.push(avgAccuraciesArr[i] || 0)
+          speedData.push(avgSpeedsArr[i] || 0)
         })
       } else {
         // 后端无数据时显示空图表（不再生成假数据）
@@ -460,55 +469,57 @@ export default {
 
     .weekday-label {
       text-align: center;
-      font-size: $font-size-xs;
+      font-size: 10px;
       color: var(--color-text-secondary);
-      padding: 4px 0;
+      padding: 2px 0;
     }
   }
 
   .calendar-grid-month {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 3px;
+    gap: 12px;
     margin-bottom: #{$spacing-md};
 
     .calendar-cell-month {
       aspect-ratio: 1;
-      border-radius: 4px;
-      min-height: 28px;
+      border-radius: 3px;
+      min-height: 2px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       position: relative;
-      transition: transform 0.15s ease;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, filter 0.2s ease;
       cursor: pointer;
 
       &:hover {
-        transform: scale(1.05);
-        z-index: 1;
+        transform: scale(1.12);
+        z-index: 10;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        filter: brightness(1.25);
       }
 
       &.other-month {
-        opacity: 0.3;
+        opacity: 0.2;
       }
 
       &.today {
-        border: 2px solid var(--color-primary);
+        border: 1.5px solid var(--color-primary);
         font-weight: 700;
       }
 
       .day-number {
-        font-size: $font-size-xs;
+        font-size: 16px;
         color: var(--color-text);
         line-height: 1.2;
       }
 
       .day-count {
-        font-size: 9px;
+        font-size: 14px;
         color: var(--color-text-secondary);
         line-height: 1.2;
-        margin-top: 1px;
+        margin-top: 0;
       }
     }
   }
@@ -517,18 +528,19 @@ export default {
     display: flex;
     align-items: center;
     gap: #{$spacing-sm};
-    font-size: $font-size-xs;
+    font-size: $font-size-sm;
     color: var(--color-text-secondary);
 
     .legend-cells {
       display: flex;
-      gap: 3px;
+      gap: 2px;
 
       .calendar-cell {
-        width: 14px;
-        height: 14px;
+        width: 6px;
+        height: 6px;
         aspect-ratio: unset;
         min-height: unset;
+        border-radius: 2px;
       }
     }
   }

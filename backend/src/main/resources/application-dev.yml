@@ -2,7 +2,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://192.168.1.100:3306/mochao?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:mochao}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:mochao}
     driver-class-name: com.mysql.cj.jdbc.Driver
   redis:
     host: ${REDIS_HOST:192.168.1.100}
@@ -15,9 +15,21 @@ spring:
         max-idle: 4
         min-idle: 0
         max-wait: -1ms
-    password: ${REDIS_PASSWORD:}
+    password: ${REDIS_PASSWORD:root}
+
+# 开发环境 JWT 密钥（生产环境必须通过 JWT_SECRET 环境变量覆盖）
+jwt:
+  secret: ${JWT_SECRET:mochao-secret-key-2024-very-long-secret-key-for-jwt}
 
 logging:
   level:
     com.mochao: debug
     org.springframework.security: debug
+
+# 开发环境 MinIO 配置
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://192.168.1.100:9000}
+  access-key: ${MINIO_ACCESS_KEY:minio_CTA3B7}
+  secret-key: ${MINIO_SECRET_KEY:minio_523rdx}
+  bucket: ${MINIO_BUCKET:mochao}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}

@@ -1,6 +1,7 @@
 package com.mochao.module.practice.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mochao.common.constant.Constants;
 import com.mochao.common.exception.BusinessException;
@@ -99,6 +100,9 @@ public class PracticeServiceImpl implements PracticeService {
         session.setCurrentPosition(dto.getCurrentPosition());
         session.setTypedChars(dto.getTypedChars());
         session.setErrorCount(dto.getErrorCount());
+        if (dto.getDuration() != null) {
+            session.setDuration(dto.getDuration());
+        }
         session.setUpdatedAt(LocalDateTime.now());
         practiceSessionMapper.updateById(session);
         return session;
@@ -137,9 +141,15 @@ public class PracticeServiceImpl implements PracticeService {
         session.setErrorCount(dto.getErrorCount());
         session.setDuration(dto.getDuration());
         session.setAccuracy(dto.getAccuracy());
-        session.setSpeed(dto.getSpeed());
+        // 钳制 speed：防止 NaN/Infinity/超大值导致 MySQL DECIMAL 溢出
+        Double speed = dto.getSpeed();
+        if (speed == null || speed.isNaN() || speed.isInfinite() || speed < 0) {
+            speed = 0.0;
+        }
+        speed = Math.min(speed, 99999.99);
+        session.setSpeed(speed);
         session.setEndTime(LocalDateTime.now());
-        session.setScore(calculateScore(dto.getAccuracy(), dto.getSpeed()));
+        session.setScore(calculateScore(dto.getAccuracy(), speed));
         session.setUpdatedAt(LocalDateTime.now());
         practiceSessionMapper.updateById(session);
 
@@ -166,6 +176,7 @@ public class PracticeServiceImpl implements PracticeService {
         Page<PracticeSession> pageObj = new Page<>(page, size);
         LambdaQueryWrapper<PracticeSession> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PracticeSession::getUserId, userId)
+                .eq(PracticeSession::getStatus, Constants.PRACTICE_STATUS_COMPLETED)
                 .orderByDesc(PracticeSession::getCreatedAt);
         return practiceSessionMapper.selectPage(pageObj, wrapper);
     }
@@ -192,46 +203,63 @@ public class PracticeServiceImpl implements PracticeService {
 
     private void updateDailyStatistics(Long userId, PracticeSession session) {
         LocalDate today = LocalDate.now();
-        DailyStatistics stat = dailyStatisticsMapper.selectOne(
-                new LambdaQueryWrapper<DailyStatistics>()
-                        .eq(DailyStatistics::getUserId, userId)
-                        .eq(DailyStatistics::getStatDate, today));
+        int typedChars = session.getTypedChars() != null ? session.getTypedChars() : 0;
+        int duration = session.getDuration() != null ? session.getDuration() : 0;
 
-        if (stat == null) {
-            stat = new DailyStatistics();
+        // 重新计算当天所有已完成练习的平均值（按完成时间归类，避免跨天练习归类错误）
+        List<PracticeSession> todaySessions = practiceSessionMapper.selectList(
+                new LambdaQueryWrapper<PracticeSession>()
+                        .eq(PracticeSession::getUserId, userId)
+                        .eq(PracticeSession::getStatus, Constants.PRACTICE_STATUS_COMPLETED)
+                        .ge(PracticeSession::getEndTime, today.atStartOfDay()));
+        double avgAcc = todaySessions.stream()
+                .filter(s -> s.getAccuracy() != null)
+                .mapToDouble(PracticeSession::getAccuracy)
+                .average().orElse(0.0);
+        double avgSpd = todaySessions.stream()
+                .filter(s -> s.getSpeed() != null)
+                .mapToDouble(PracticeSession::getSpeed)
+                .average().orElse(0.0);
+
+        // 先尝试原子更新（practice_count / total_chars / total_duration 使用 SQL 原子加法，避免竞态）
+        int rows = dailyStatisticsMapper.update(null,
+                new LambdaUpdateWrapper<DailyStatistics>()
+                        .eq(DailyStatistics::getUserId, userId)
+                        .eq(DailyStatistics::getStatDate, today)
+                        .setSql("practice_count = practice_count + 1")
+                        .setSql("total_chars = total_chars + " + typedChars)
+                        .setSql("total_duration = total_duration + " + duration)
+                        .set(DailyStatistics::getAvgAccuracy, avgAcc)
+                        .set(DailyStatistics::getAvgSpeed, avgSpd)
+                        .set(DailyStatistics::getUpdatedAt, LocalDateTime.now()));
+
+        // 更新 0 行说明记录不存在，执行插入（有唯一索引 uk_user_date 兜底）
+        if (rows == 0) {
+            DailyStatistics stat = new DailyStatistics();
             stat.setUserId(userId);
             stat.setStatDate(today);
             stat.setPracticeCount(1);
-            stat.setTotalChars(session.getTypedChars() != null ? session.getTypedChars() : 0);
-            stat.setTotalDuration(session.getDuration() != null ? session.getDuration() : 0);
-            stat.setAvgAccuracy(session.getAccuracy() != null ? session.getAccuracy() : 0.0);
-            stat.setAvgSpeed(session.getSpeed() != null ? session.getSpeed() : 0.0);
-            stat.setCreatedAt(LocalDateTime.now());
-            stat.setUpdatedAt(LocalDateTime.now());
-            dailyStatisticsMapper.insert(stat);
-        } else {
-            stat.setPracticeCount(stat.getPracticeCount() + 1);
-            stat.setTotalChars(stat.getTotalChars() + (session.getTypedChars() != null ? session.getTypedChars() : 0));
-            stat.setTotalDuration(stat.getTotalDuration() + (session.getDuration() != null ? session.getDuration() : 0));
-
-            // 重新计算平均值
-            List<PracticeSession> todaySessions = practiceSessionMapper.selectList(
-                    new LambdaQueryWrapper<PracticeSession>()
-                            .eq(PracticeSession::getUserId, userId)
-                            .eq(PracticeSession::getStatus, Constants.PRACTICE_STATUS_COMPLETED)
-                            .ge(PracticeSession::getCreatedAt, today.atStartOfDay()));
-            double avgAcc = todaySessions.stream()
-                    .filter(s -> s.getAccuracy() != null)
-                    .mapToDouble(PracticeSession::getAccuracy)
-                    .average().orElse(0.0);
-            double avgSpd = todaySessions.stream()
-                    .filter(s -> s.getSpeed() != null)
-                    .mapToDouble(PracticeSession::getSpeed)
-                    .average().orElse(0.0);
+            stat.setTotalChars(typedChars);
+            stat.setTotalDuration(duration);
             stat.setAvgAccuracy(avgAcc);
             stat.setAvgSpeed(avgSpd);
+            stat.setCreatedAt(LocalDateTime.now());
             stat.setUpdatedAt(LocalDateTime.now());
-            dailyStatisticsMapper.updateById(stat);
+            try {
+                dailyStatisticsMapper.insert(stat);
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                // 并发插入冲突，回退到原子更新
+                dailyStatisticsMapper.update(null,
+                        new LambdaUpdateWrapper<DailyStatistics>()
+                                .eq(DailyStatistics::getUserId, userId)
+                                .eq(DailyStatistics::getStatDate, today)
+                                .setSql("practice_count = practice_count + 1")
+                                .setSql("total_chars = total_chars + " + typedChars)
+                                .setSql("total_duration = total_duration + " + duration)
+                                .set(DailyStatistics::getAvgAccuracy, avgAcc)
+                                .set(DailyStatistics::getAvgSpeed, avgSpd)
+                                .set(DailyStatistics::getUpdatedAt, LocalDateTime.now()));
+            }
         }
     }
 }

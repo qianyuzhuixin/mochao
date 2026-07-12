@@ -1,20 +1,15 @@
 package com.mochao.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Web MVC 配置
+ * <p>
+ * 文件静态资源映射已移除，改为 FileController 从 MinIO 流式代理。
+ * 保留此类用于未来的 MVC 自定义配置。
+ */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
-
-    @Value("${mochao.upload.music-dir:uploads/music}")
-    private String musicDir;
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 映射音乐文件静态资源：/files/music/xxx → uploads/music/xxx
-        registry.addResourceHandler("/files/music/**")
-                .addResourceLocations("file:" + musicDir + "/");
-    }
+    // 文件访问由 FileController 处理（MinIO 流式代理）
 }

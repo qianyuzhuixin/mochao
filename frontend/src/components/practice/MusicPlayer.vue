@@ -168,7 +168,9 @@ export default {
     ...mapActions('music', ['fetchMusicList', 'playNext', 'playPrev', 'togglePlay']),
 
     getFileUrl(track) {
-      return `${BASE_API}/files/music/${track.filePath}`
+      // 使用音乐 ID 而非文件路径构建 URL，
+      // 避免 URL 中出现 .mp3 等扩展名被 IDM 等下载器拦截
+      return `${BASE_API}/files/music/${track.id}`
     },
 
     loadTrack(track) {
@@ -295,51 +297,49 @@ export default {
 
 <style lang="scss" scoped>
 .music-player-bar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 16px;
-  background: var(--color-card-bg);
-  border-top: 1px solid var(--color-border);
-  opacity: 0.5;
-  transition: opacity 0.3s;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  transition: border-color 0.25s, box-shadow 0.25s;
 
-  &.is-active,
+  &.is-active {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.12);
+  }
+
   &:hover {
-    opacity: 1;
+    border-color: var(--color-primary);
   }
 
   .player-controls {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     flex-shrink: 0;
   }
 
   .player-track-info {
-    flex: 1;
     min-width: 0;
 
     .track-display {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       cursor: pointer;
       color: var(--color-text);
       font-size: $font-size-sm;
-      padding: 4px 8px;
-      border-radius: 4px;
-      max-width: 100%;
-
-      &:hover {
-        background: var(--color-border);
-      }
+      max-width: 160px;
 
       .track-name {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 200px;
+        max-width: 120px;
       }
 
       .track-placeholder {
@@ -350,7 +350,6 @@ export default {
       .el-icon-arrow-up {
         font-size: $font-size-xs;
         color: var(--color-text-placeholder);
-        margin-left: 2px;
       }
     }
   }
@@ -358,7 +357,7 @@ export default {
   .player-volume {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
 
     .el-icon-bell {
@@ -377,21 +376,19 @@ export default {
     }
 
     .volume-slider {
-      width: 80px;
+      width: 60px;
     }
   }
 }
 
 @media (max-width: 768px) {
   .music-player-bar {
-    padding: 6px 10px;
-
-    .player-track-info .track-display .track-name {
-      max-width: 100px;
+    .player-track-info {
+      display: none;
     }
 
-    .player-volume .volume-slider {
-      width: 50px;
+    .player-volume {
+      display: none;
     }
   }
 }

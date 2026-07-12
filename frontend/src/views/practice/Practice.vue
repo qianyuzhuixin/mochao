@@ -237,7 +237,7 @@ export default {
         if (session && session.id == this.sessionId) {
           // 恢复进行中的会话
           bookId = session.bookId
-          this.typedText = session.progress || session.typedText || ''
+          this.typedText = session.typedContent || ''
           this.duration = session.duration || 0
           this.pausedDuration = this.duration
           // 恢复章节模式 — 优先从 session 获取，fallback 到 URL query
@@ -343,9 +343,11 @@ export default {
     async saveProgress() {
       try {
         await updateProgress(this.sessionId, {
-          progress: this.typedText,
-          duration: this.duration,
-          accuracy: this.accuracy
+          typedContent: this.typedText,
+          currentPosition: this.typedText.length,
+          typedChars: this.typedText.length,
+          errorCount: this.errorCount,
+          duration: this.duration
         })
       } catch (e) {
         // 静默失败
@@ -402,13 +404,12 @@ export default {
 
       try {
         await completePractice(this.sessionId, {
-          progress: this.typedText,
+          typedContent: this.typedText,
           typedChars: this.typedText.length,
           errorCount: this.errorCount,
           duration: this.duration,
           accuracy: this.finalAccuracy,
-          speed: this.finalSpeed,
-          score: this.totalScore
+          speed: this.finalSpeed
         })
       } catch (e) {
         // 静默处理

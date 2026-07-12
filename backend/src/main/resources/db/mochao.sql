@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS t_practice_session (
     end_time         DATETIME      DEFAULT NULL COMMENT '结束时间',
     duration         INT           DEFAULT 0 COMMENT '耗时(秒)',
     accuracy         DECIMAL(5,2)  DEFAULT 0.00 COMMENT '正确率(%)',
-    speed            DECIMAL(5,2)  DEFAULT 0.00 COMMENT '速度(字/分)',
+    speed            DECIMAL(7,2)  DEFAULT 0.00 COMMENT '速度(字/分)',
     score            INT           DEFAULT 0 COMMENT '综合评分',
     created_at       DATETIME      DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS t_daily_statistics (
     total_chars     INT          DEFAULT 0 COMMENT '总练习字数',
     total_duration  INT          DEFAULT 0 COMMENT '总耗时(秒)',
     avg_accuracy    DECIMAL(5,2) DEFAULT 0.00 COMMENT '平均正确率',
-    avg_speed       DECIMAL(5,2) DEFAULT 0.00 COMMENT '平均速度',
+    avg_speed       DECIMAL(7,2) DEFAULT 0.00 COMMENT '平均速度',
     created_at      DATETIME     DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_date (user_id, stat_date)

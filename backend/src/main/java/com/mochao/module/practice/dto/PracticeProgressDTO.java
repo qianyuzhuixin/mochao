@@ -9,4 +9,5 @@ public class PracticeProgressDTO {
     private Integer currentPosition;
     private Integer typedChars;
     private Integer errorCount;
+    private Integer duration;
 }
