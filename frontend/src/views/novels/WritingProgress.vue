@@ -63,7 +63,7 @@
 <script>
 import ProgressOverview from '@/components/novel/ProgressOverview.vue'
 import { getNovelProgress, getChapters } from '@/api/novel'
-import echarts from 'echarts'
+import * as echarts from 'echarts'
 
 export default {
   name: 'WritingProgress',
