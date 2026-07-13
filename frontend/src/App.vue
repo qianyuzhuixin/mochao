@@ -17,7 +17,7 @@
               <el-menu-item index="/library">书库</el-menu-item>
               <el-menu-item index="/collections">好词好句</el-menu-item>
               <el-menu-item index="/novels">我的小说</el-menu-item>
-              <el-menu-item index="/dashboard">数据看板</el-menu-item>
+              <el-menu-item index="/ranking">扫榜</el-menu-item>
               <el-menu-item index="/music">背景音乐</el-menu-item>
             </el-menu>
           </div>
@@ -32,6 +32,8 @@
                 <i class="el-icon-arrow-down" />
               </span>
               <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item v-if="isAdmin" command="/admin/dashboard" icon="el-icon-setting">管理后台</el-dropdown-item>
+                <el-dropdown-item v-if="isAdmin" command="" disabled divided />
                 <el-dropdown-item command="/profile">个人中心</el-dropdown-item>
                 <el-dropdown-item command="/profile/ai-config">AI 模型配置</el-dropdown-item>
                 <el-dropdown-item command="/dashboard">数据看板</el-dropdown-item>
@@ -61,9 +63,10 @@
           <el-menu-item index="/library">书库</el-menu-item>
           <el-menu-item index="/collections">好词好句</el-menu-item>
           <el-menu-item index="/novels">我的小说</el-menu-item>
-          <el-menu-item index="/dashboard">数据看板</el-menu-item>
+          <el-menu-item index="/ranking">扫榜</el-menu-item>
           <el-menu-item index="/music">背景音乐</el-menu-item>
           <el-menu-item index="/profile">个人中心</el-menu-item>
+          <el-menu-item v-if="isAdmin" index="/admin/dashboard">管理后台</el-menu-item>
         </el-menu>
       </el-drawer>
     </template>
@@ -88,7 +91,7 @@ export default {
   },
   computed: {
     ...mapGetters('theme', ['currentTheme']),
-    ...mapGetters('auth', ['isLoggedIn', 'userInfo']),
+    ...mapGetters('auth', ['isLoggedIn', 'userInfo', 'isAdmin']),
     showHeader() {
       const path = this.$route.path
       if (path === '/') return false
@@ -108,7 +111,7 @@ export default {
       if (path.startsWith('/novels')) return '/novels'
       if (path.startsWith('/library')) return '/library'
       if (path.startsWith('/collections')) return '/collections'
-      if (path.startsWith('/dashboard')) return '/dashboard'
+      if (path.startsWith('/ranking')) return '/ranking'
       if (path.startsWith('/music')) return '/music'
       if (path.startsWith('/profile')) return '/profile'
       return path

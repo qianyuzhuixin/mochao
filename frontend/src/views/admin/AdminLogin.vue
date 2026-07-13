@@ -43,7 +43,7 @@ export default {
         this.loading = true
         try {
           const res = await this.$store.dispatch('auth/login', { ...this.form, isAdmin: true })
-          if (res.user && res.user.role !== 'admin') {
+          if (!res.userInfo || res.userInfo.role !== 'ADMIN') {
             this.$message.error('该账号没有管理员权限')
             await this.$store.dispatch('auth/logout')
             return

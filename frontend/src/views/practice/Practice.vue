@@ -191,8 +191,12 @@ export default {
       if (this.typedText.length === 0) return 100
       let correct = 0
       const len = this.typedText.length
+      const normalizeSpace = (c) => {
+        if (c === '\u3000' || c === '\u00A0' || c === '\u2002' || c === '\u2003') return '\u0020'
+        return c
+      }
       for (let i = 0; i < len; i++) {
-        if (this.typedText[i] === this.originalChars[i]) {
+        if (normalizeSpace(this.typedText[i]) === normalizeSpace(this.originalChars[i])) {
           correct++
         }
       }

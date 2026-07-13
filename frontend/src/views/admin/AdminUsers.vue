@@ -7,8 +7,8 @@
         <el-button slot="append" icon="el-icon-search" @click="fetchData" />
       </el-input>
       <el-select v-model="statusFilter" placeholder="状态" clearable @change="fetchData" style="width: 120px">
-        <el-option label="正常" value="active" />
-        <el-option label="禁用" value="disabled" />
+        <el-option label="正常" :value="1" />
+        <el-option label="禁用" :value="0" />
       </el-select>
     </div>
 
@@ -17,15 +17,15 @@
       <el-table-column prop="email" label="邮箱" min-width="180" />
       <el-table-column prop="role" label="角色" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" size="mini">
-            {{ row.role === 'admin' ? '管理员' : '用户' }}
+          <el-tag :type="row.role === 'ADMIN' ? 'danger' : 'info'" size="mini">
+            {{ row.role === 'ADMIN' ? '管理员' : '用户' }}
           </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'active' ? 'success' : 'danger'" size="mini">
-            {{ row.status === 'active' ? '正常' : '禁用' }}
+          <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="mini">
+            {{ row.status === 1 ? '正常' : '禁用' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -35,10 +35,10 @@
         <template #default="{ row }">
           <el-button
             type="text"
-            :icon="row.status === 'active' ? 'el-icon-circle-close' : 'el-icon-circle-check'"
+            :icon="row.status === 1 ? 'el-icon-circle-close' : 'el-icon-circle-check'"
             @click="handleToggleStatus(row)"
           >
-            {{ row.status === 'active' ? '禁用' : '启用' }}
+            {{ row.status === 1 ? '禁用' : '启用' }}
           </el-button>
         </template>
       </el-table-column>
@@ -90,8 +90,8 @@ export default {
       }
     },
     handleToggleStatus(row) {
-      const newStatus = row.status === 'active' ? 'disabled' : 'active'
-      const action = newStatus === 'active' ? '启用' : '禁用'
+      const newStatus = row.status === 1 ? 0 : 1
+      const action = newStatus === 1 ? '启用' : '禁用'
       this.$confirm(`确定要${action}用户"${row.username}"吗？`, '提示', {
         confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
       }).then(async () => {

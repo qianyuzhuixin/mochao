@@ -1,9 +1,12 @@
 package com.mochao.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mochao.common.result.Result;
+import com.mochao.common.result.ResultCode;
 import com.mochao.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -15,15 +18,21 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import javax.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
+
 @Configuration
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                         ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -51,13 +60,29 @@ public class SecurityConfig {
                 .antMatchers("/v3/api-docs/**").permitAll()
                 // 音乐文件流式代理公开访问（Audio 元素无法携带 Auth Header）
                 .antMatchers("/v1/files/music/**").permitAll()
-                .antMatchers("/v1/books/categories").permitAll()
-                .antMatchers(HttpMethod.GET, "/v1/books").permitAll()
-                .antMatchers(HttpMethod.GET, "/v1/books/{id}").permitAll()
-                .antMatchers(HttpMethod.GET, "/v1/books/{id}/chapters").permitAll()
                 // 管理后台接口仅管理员可访问
                 .antMatchers("/v1/admin/**").hasRole("ADMIN")
-                .anyRequest().authenticated();
+                .anyRequest().authenticated()
+            .and()
+            .exceptionHandling()
+                // 未认证访问受保护资源 → 返回 401（前端据此跳转登录）
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                    response.getWriter().write(objectMapper.writeValueAsString(
+                            Result.error(ResultCode.UNAUTHORIZED, "请先登录")
+                    ));
+                })
+                // 已认证但无权限（如非管理员访问 /v1/admin/**）→ 返回 403（前端只提示，不跳转）
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                    response.getWriter().write(objectMapper.writeValueAsString(
+                            Result.error(ResultCode.FORBIDDEN, "没有权限访问")
+                    ));
+                });
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

@@ -14,11 +14,6 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
-# ==================== 墨抄应用配置 ====================
-mochao:
-  upload:
-    music-dir: ${MUSIC_UPLOAD_DIR:uploads/music}
-
 # ==================== MinIO 对象存储 ====================
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
@@ -59,6 +54,12 @@ ai:
   temperature: ${AI_TEMPERATURE:0.8}
   proxy-host: ${AI_PROXY_HOST:}
   proxy-port: ${AI_PROXY_PORT:0}
+
+# ==================== 扫榜抓取服务 ====================
+# 独立 Node.js Playwright 服务地址（方案 B：用户触发式抓取）
+mochao:
+  scraper:
+    url: ${SCRAPER_URL:http://127.0.0.1:3001}
 
 springdoc:
   swagger-ui:

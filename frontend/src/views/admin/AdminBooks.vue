@@ -125,7 +125,7 @@ export default {
     async fetchData() {
       this.loading = true
       try {
-        const res = await getBooks({ page: this.page, pageSize: this.pageSize, keyword: this.keyword })
+        const res = await getBooks({ page: this.page, size: this.pageSize, keyword: this.keyword })
         this.list = res.list || res.records || res || []
         this.total = res.total || this.list.length
       } catch (e) {

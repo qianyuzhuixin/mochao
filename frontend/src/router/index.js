@@ -29,13 +29,13 @@ const routes = [
     path: '/library',
     name: 'Library',
     component: () => import('@/views/library/Library.vue'),
-    meta: { title: '书库' }
+    meta: { title: '书库', requiresAuth: true }
   },
   {
     path: '/library/:id',
     name: 'BookDetail',
     component: () => import('@/views/library/BookDetail.vue'),
-    meta: { title: '素材详情' }
+    meta: { title: '素材详情', requiresAuth: true }
   },
   {
     path: '/practice/:sessionId',
@@ -66,6 +66,12 @@ const routes = [
     name: 'NovelList',
     component: () => import('@/views/novels/NovelList.vue'),
     meta: { title: '我的小说', requiresAuth: true }
+  },
+  {
+    path: '/ranking',
+    name: 'Ranking',
+    component: () => import('@/views/ranking/Ranking.vue'),
+    meta: { title: '扫榜分析', requiresAuth: true }
   },
   {
     path: '/novels/create',

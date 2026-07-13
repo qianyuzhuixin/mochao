@@ -20,7 +20,7 @@
               :key="cIndex"
               class="char"
               :class="getCharClassInPara(cIndex, para)"
-            >{{ char === ' ' ? '\u00A0' : char }}</span>
+            >{{ char === '\u3000' || char === ' ' ? '\u00A0' : char }}</span>
           </span>
           <span
             v-else
@@ -93,6 +93,18 @@ export default {
   },
   methods: {
     /**
+     * 统一空格比较：全角空格、半角空格、不间断空格都视为等价
+     */
+    normalizeSpace(char) {
+      if (char === '\u3000' || char === '\u00A0' || char === '\u2002' || char === '\u2003') {
+        return '\u0020'
+      }
+      return char
+    },
+    charsEqual(a, b) {
+      return this.normalizeSpace(a) === this.normalizeSpace(b)
+    },
+    /**
      * 将长文本按固定长度切分成段落（每段最多 300 字符）
      * 已完成/待输入段落用整块文本渲染，只有当前段落逐字渲染
      * 这避免了 18 万字文本产生 18 万个 DOM 节点的性能灾难
@@ -121,7 +133,7 @@ export default {
       }
       const typedChar = this.typedText[globalIndex]
       const originalChar = this.originalChars[globalIndex]
-      if (typedChar === originalChar) {
+      if (this.charsEqual(typedChar, originalChar)) {
         return 'char-correct'
       }
       return 'char-wrong'
@@ -133,7 +145,7 @@ export default {
       // 检查所有新输入的字符（支持粘贴场景）
       if (value.length > prevLen) {
         for (let i = prevLen; i < value.length; i++) {
-          if (value[i] !== this.originalChars[i]) {
+          if (!this.charsEqual(value[i], this.originalChars[i])) {
             this.$emit('error', {
               index: i,
               expected: this.originalChars[i],
@@ -171,7 +183,7 @@ export default {
       let correct = 0
       const len = this.typedText.length
       for (let i = 0; i < len; i++) {
-        if (this.typedText[i] === this.originalChars[i]) {
+        if (this.charsEqual(this.typedText[i], this.originalChars[i])) {
           correct++
         }
       }

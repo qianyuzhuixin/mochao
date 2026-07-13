@@ -9,7 +9,7 @@ export function getUsers(params) {
 }
 
 export function updateUserStatus(id, status) {
-  return request({ url: `/admin/users/${id}/status`, method: 'put', data: { status } })
+  return request({ url: `/admin/users/${id}/status`, method: 'put', params: { status } })
 }
 
 export function createBook(data) {
@@ -22,6 +22,10 @@ export function updateBook(id, data) {
 
 export function deleteBook(id) {
   return request({ url: `/admin/books/${id}`, method: 'delete' })
+}
+
+export function getBooks(params) {
+  return request({ url: '/admin/books', method: 'get', params })
 }
 
 export function importBooks(data) {

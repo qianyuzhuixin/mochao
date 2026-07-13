@@ -9,7 +9,7 @@
             <i class="el-icon-user" />
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ data.userCount || 0 }}</div>
+            <div class="stat-value">{{ data.totalUsers || 0 }}</div>
             <div class="stat-label">总用户数</div>
           </div>
         </div>
@@ -20,7 +20,7 @@
             <i class="el-icon-reading" />
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ data.bookCount || 0 }}</div>
+            <div class="stat-value">{{ data.totalBooks || 0 }}</div>
             <div class="stat-label">素材总数</div>
           </div>
         </div>
@@ -31,7 +31,7 @@
             <i class="el-icon-edit" />
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ data.practiceCount || 0 }}</div>
+            <div class="stat-value">{{ data.totalPractices || 0 }}</div>
             <div class="stat-label">练习总次数</div>
           </div>
         </div>
@@ -42,7 +42,7 @@
             <i class="el-icon-document" />
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ data.novelCount || 0 }}</div>
+            <div class="stat-value">{{ data.totalNovels || 0 }}</div>
             <div class="stat-label">小说总数</div>
           </div>
         </div>
@@ -77,7 +77,7 @@
 
 <script>
 import { getDashboard } from '@/api/admin'
-import echarts from 'echarts'
+import * as echarts from 'echarts'
 
 export default {
   name: 'AdminDashboard',
@@ -121,33 +121,35 @@ export default {
         days.push(`${d.getMonth() + 1}/${d.getDate()}`)
       }
 
-      // 用户增长图
+      // 用户增长图（使用后端真实数据，无数据时显示 0）
       if (this.$refs.userChart) {
+        const userGrowth = this.data.recentUserGrowth || days.map(() => 0)
         this.userChart = echarts.init(this.$refs.userChart)
         this.userChart.setOption({
           tooltip: { trigger: 'axis' },
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'category', data: days },
-          yAxis: { type: 'value' },
+          yAxis: { type: 'value', minInterval: 1 },
           series: [{
             type: 'bar',
-            data: days.map(() => Math.floor(Math.random() * 50) + 5),
+            data: userGrowth,
             itemStyle: { color: '#4A6CF7' }
           }]
         })
       }
 
-      // 练习量图
+      // 练习量图（使用后端真实数据，无数据时显示 0）
       if (this.$refs.practiceChart) {
+        const practiceCount = this.data.recentPracticeCount || days.map(() => 0)
         this.practiceChart = echarts.init(this.$refs.practiceChart)
         this.practiceChart.setOption({
           tooltip: { trigger: 'axis' },
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'category', data: days },
-          yAxis: { type: 'value' },
+          yAxis: { type: 'value', minInterval: 1 },
           series: [{
             type: 'line',
-            data: days.map(() => Math.floor(Math.random() * 200) + 50),
+            data: practiceCount,
             smooth: true,
             itemStyle: { color: '#52C41A' },
             areaStyle: { color: 'rgba(82, 196, 26, 0.2)' }

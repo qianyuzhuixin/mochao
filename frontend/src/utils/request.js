@@ -65,7 +65,11 @@ service.interceptors.response.use(
       removeUserInfo()
       router.push('/login')
     } else if (status === 403) {
-      Message.error('没有权限访问')
+      const isAdminPath = router.currentRoute.path.startsWith('/admin')
+      Message.error(isAdminPath ? '没有管理员权限' : '没有权限访问')
+      if (isAdminPath) {
+        router.push('/')
+      }
     } else if (status === 404) {
       Message.error('请求资源不存在')
     } else if (status >= 500) {
