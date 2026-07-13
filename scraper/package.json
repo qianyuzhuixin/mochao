@@ -1,0 +1,14 @@
+{
+  "name": "mochao-scraper",
+  "version": "2.0.0",
+  "description": "MoChao novel ranking scraper — mobile SSR JSON extraction (no browser needed)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2",
+    "iconv-lite": "^0.7.3",
+    "opentype.js": "^2.0.0"
+  }
+}
