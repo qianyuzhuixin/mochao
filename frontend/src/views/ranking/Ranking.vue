@@ -10,6 +10,57 @@
 
     <!-- 筛选区 -->
     <div class="filter-bar">
+      <!-- 模式切换 -->
+      <div class="mode-tabs">
+        <button
+          :class="['mode-tab', { active: viewMode === 'ranking' }]"
+          @click="switchMode('ranking')"
+        >
+          <i class="el-icon-s-data" /> 榜单浏览
+        </button>
+        <button
+          :class="['mode-tab', { active: viewMode === 'search' }]"
+          @click="switchMode('search')"
+        >
+          <i class="el-icon-search" /> 小说搜索
+        </button>
+      </div>
+
+      <!-- 搜索模式 -->
+      <template v-if="viewMode === 'search'">
+        <div class="search-bar">
+          <div class="search-row">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="输入书名或作者，搜索全平台小说"
+              clearable
+              size="medium"
+              class="search-input"
+              @keyup.enter.native="handleSearch"
+              @clear="clearSearch"
+            >
+              <el-select
+                v-model="searchPlatform"
+                slot="prepend"
+                placeholder="全平台"
+                style="width:120px"
+              >
+                <el-option label="全平台" value="" />
+                <el-option
+                  v-for="p in platforms"
+                  :key="p.value"
+                  :label="p.label"
+                  :value="p.value"
+                />
+              </el-select>
+              <el-button slot="append" icon="el-icon-search" @click="handleSearch">搜索</el-button>
+            </el-input>
+          </div>
+        </div>
+      </template>
+
+      <!-- 榜单模式 -->
+      <template v-else>
       <!-- 第一行：平台 + 频道 -->
       <div class="filter-row">
         <div class="filter-group">
@@ -108,10 +159,18 @@
       <div v-if="downloadMsg" :class="['scrape-msg', downloadMsgType]">
         {{ downloadMsg }}
       </div>
+      </template>
     </div>
 
     <!-- 结果表格 -->
     <div class="result-section">
+      <!-- 搜索模式表头 -->
+      <div v-if="viewMode === 'search' && !loading" class="search-result-header">
+        <span v-if="searchKeyword">搜索 "{{ searchKeyword }}"：共 {{ total }} 条结果</span>
+        <span v-else>请输入关键词开始搜索</span>
+        <span class="search-source">数据来源：番茄小说实时搜索</span>
+      </div>
+
       <div v-if="loading" class="loading-wrap">
         <i class="el-icon-loading" />
         <span>加载中...</span>
@@ -119,12 +178,16 @@
 
       <template v-else-if="tableData.length > 0">
         <div class="result-header">
-          <span>共 {{ total }} 条记录</span>
-          <span class="result-date" v-if="snapDate">快照日期：{{ snapDate }}</span>
+          <span v-if="viewMode === 'ranking'">共 {{ total }} 条记录</span>
+          <span class="result-date" v-if="snapDate && viewMode === 'ranking'">快照日期：{{ snapDate }}</span>
         </div>
         <el-table :data="tableData" stripe size="small" highlight-current-row>
-          <el-table-column type="index" label="#" width="50" :index="indexMethod" />
-          <el-table-column prop="rankNo" label="排名" width="60" sortable />
+          <el-table-column v-if="viewMode === 'ranking'" prop="rankNo" label="排名" width="60" sortable />
+          <el-table-column v-if="viewMode === 'search'" prop="platform" label="平台" width="100">
+            <template #default="{ row }">
+              {{ platformLabel(row.platform) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="bookName" label="书名" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
               <a v-if="row.bookUrl" :href="row.bookUrl" target="_blank" class="book-link">{{ row.bookName }}</a>
@@ -133,7 +196,7 @@
           </el-table-column>
           <el-table-column prop="author" label="作者" width="120" show-overflow-tooltip />
           <el-table-column prop="category" label="分类" width="100" />
-          <el-table-column prop="hotValue" label="热度" width="100" sortable>
+          <el-table-column v-if="viewMode === 'ranking'" prop="hotValue" label="热度" width="100" sortable>
             <template #default="{ row }">
               {{ formatNumber(row.hotValue) }}
             </template>
@@ -143,7 +206,20 @@
               {{ formatWordCount(row.wordCount) }}
             </template>
           </el-table-column>
-          <el-table-column prop="intro" label="简介" min-width="200" show-overflow-tooltip />
+          <el-table-column label="简介" min-width="200">
+            <template #default="{ row }">
+              <el-tooltip
+                v-if="row.intro"
+                :content="row.intro"
+                placement="top"
+                popper-class="abstract-tooltip"
+                :enterable="false"
+              >
+                <span class="cell-text">{{ row.intro }}</span>
+              </el-tooltip>
+              <span v-else class="cell-text">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
               <el-dropdown
@@ -156,8 +232,21 @@
                   <i class="el-icon-download" /> 下载<i class="el-icon-arrow-down el-icon--right" />
                 </el-button>
                 <el-dropdown-menu slot="dropdown">
-                  <el-dropdown-item command="personal">下载到个人素材</el-dropdown-item>
-                  <el-dropdown-item v-if="isAdmin" command="library">下载到内置书库</el-dropdown-item>
+                  <el-dropdown-item command="txt" icon="el-icon-document">
+                    TXT 文本
+                  </el-dropdown-item>
+                  <el-dropdown-item command="html" icon="el-icon-notebook-1">
+                    HTML 网页
+                  </el-dropdown-item>
+                  <el-dropdown-item command="pdf" icon="el-icon-files">
+                    PDF 电子书
+                  </el-dropdown-item>
+                  <el-dropdown-item command="personal" icon="el-icon-user" divided>
+                    下载到个人素材
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="isAdmin" command="library" icon="el-icon-folder-opened">
+                    下载到内置书库
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </el-dropdown>
               <span v-else class="no-action">—</span>
@@ -165,6 +254,7 @@
           </el-table-column>
         </el-table>
         <el-pagination
+          v-if="viewMode === 'ranking'"
           class="pagination-wrap"
           layout="prev, pager, next"
           :total="total"
@@ -176,7 +266,9 @@
 
       <div v-else class="empty-wrap">
         <i class="el-icon-document" />
-        <p v-if="isToday">暂无数据，点击"立即抓取"获取今日榜单</p>
+        <p v-if="viewMode === 'search' && searchKeyword">未找到与 "{{ searchKeyword }}" 相关的小说</p>
+        <p v-else-if="viewMode === 'search'">输入书名或作者关键词，搜索已收录榜单中的小说</p>
+        <p v-else-if="isToday">暂无数据，点击"立即抓取"获取今日榜单</p>
         <p v-else>该日期暂无数据</p>
       </div>
     </div>
@@ -184,7 +276,7 @@
 </template>
 
 <script>
-import { getRanking, triggerScrape, checkTodayData, getAvailableDates, downloadBook } from '@/api/ranking'
+import { getRanking, triggerScrape, checkTodayData, getAvailableDates, downloadBook, downloadFile, searchBooks } from '@/api/ranking'
 import { mapGetters } from 'vuex'
 
 export default {
@@ -209,6 +301,12 @@ export default {
       downloadingBookIds: [],  // 正在下载的书籍 bookId 列表
       downloadMsg: '',
       downloadMsgType: 'info',
+
+      // 搜索模式
+      viewMode: 'ranking',      // 'ranking' | 'search'
+      searchKeyword: '',
+      searchPlatform: '',
+      searchLoading: false,
 
       platforms: [
         { label: '起点中文网', value: 'qidian' },
@@ -585,9 +683,10 @@ export default {
       return n.toLocaleString()
     },
 
-    /** 判断某行是否可下载（目前仅番茄支持） */
+    /** 判断某行是否可下载（番茄平台 + 有 bookUrl） */
     canDownload(row) {
-      return this.currentPlatform === 'fanqie' && row.bookUrl
+      const platform = row.platform || this.currentPlatform
+      return platform === 'fanqie' && row.bookUrl
     },
 
     /** 判断某行是否正在下载 */
@@ -611,6 +710,13 @@ export default {
         return
       }
 
+      // 文件格式下载（txt / html / pdf）
+      if (['txt', 'html', 'pdf'].includes(target)) {
+        await this.handleFileDownload(target, row, bookId)
+        return
+      }
+
+      // 下载到书库（personal / library）
       if (this.downloadingBookIds.includes(bookId)) {
         this.$message.warning('正在下载中，请稍候')
         return
@@ -622,7 +728,7 @@ export default {
 
       try {
         const res = await downloadBook({
-          platform: this.currentPlatform,
+          platform: row.platform || this.currentPlatform,
           bookId,
           target,
           maxChapters: 0
@@ -639,6 +745,115 @@ export default {
         const idx = this.downloadingBookIds.indexOf(bookId)
         if (idx > -1) this.downloadingBookIds.splice(idx, 1)
       }
+    },
+
+    /**
+     * 下载文件到本地（TXT / HTML / PDF）
+     */
+    async handleFileDownload(format, row, bookId) {
+      if (this.downloadingBookIds.includes(bookId)) {
+        this.$message.warning('正在下载中，请稍候')
+        return
+      }
+
+      this.downloadingBookIds.push(bookId)
+      const formatLabel = { txt: 'TXT', html: 'HTML', pdf: 'PDF' }[format] || format
+      this.downloadMsg = `正在生成《${row.bookName}》${formatLabel}文件...`
+      this.downloadMsgType = 'info'
+
+      try {
+        const blob = await downloadFile(bookId, format, 0)
+
+        // 从 blob 创建下载链接
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+
+        // 从响应头或默认生成文件名
+        const safeName = row.bookName.replace(/[\\/:*?"<>|]/g, '_')
+        const extMap = { txt: 'txt', html: 'html', pdf: 'pdf' }
+        link.download = `${safeName} - ${row.author || '未知'}.${extMap[format]}`
+
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        this.downloadMsg = `《${row.bookName}》${formatLabel}下载完成`
+        this.downloadMsgType = 'success'
+        this.$message.success(this.downloadMsg)
+      } catch (err) {
+        const errMsg = (err && err.message) || '文件下载失败，请确认抓取服务已启动'
+        this.downloadMsg = errMsg
+        this.downloadMsgType = 'error'
+        this.$message.error(errMsg)
+      } finally {
+        const idx = this.downloadingBookIds.indexOf(bookId)
+        if (idx > -1) this.downloadingBookIds.splice(idx, 1)
+      }
+    },
+
+    // ==================== 搜索模式 ====================
+
+    /** 切换模式 */
+    switchMode(mode) {
+      this.viewMode = mode
+      if (mode === 'ranking') {
+        this.searchKeyword = ''
+        this.tableData = []
+        this.total = 0
+        this.fetchData()
+      } else {
+        this.tableData = []
+        this.total = 0
+      }
+    },
+
+    /** 执行搜索 */
+    async handleSearch() {
+      const kw = this.searchKeyword.trim()
+      if (!kw) return
+
+      this.searchLoading = true
+      this.loading = true
+      try {
+        const res = await searchBooks({
+          keyword: kw,
+          platform: this.searchPlatform,
+          limit: 200
+        })
+        // res 可能是 { code, data: { books, total } } 或直接是 data
+        const data = (res && res.data) ? res.data : res
+        this.tableData = (data && data.books) ? data.books : []
+        this.total = (data && data.total != null) ? data.total : this.tableData.length
+      } catch (err) {
+        this.tableData = []
+        this.total = 0
+        this.$message.error('搜索失败：' + ((err && err.message) || '网络错误'))
+      } finally {
+        this.searchLoading = false
+        this.loading = false
+      }
+    },
+
+    /** 清空搜索 */
+    clearSearch() {
+      this.searchKeyword = ''
+      this.tableData = []
+      this.total = 0
+    },
+
+    /** 平台值 → 中文名 */
+    platformLabel(val) {
+      const map = {
+        qidian: '起点',
+        fanqie: '番茄',
+        jinjiang: '晋江',
+        qimao: '七猫',
+        ciweimao: '刺猬猫',
+        zhihu: '知乎'
+      }
+      return map[val] || val || '-'
     }
   }
 }
@@ -789,5 +1004,84 @@ export default {
 .no-action {
   color: var(--color-text-secondary);
   font-size: #{$font-size-sm};
+}
+
+/* ====== 搜索模式样式 ====== */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: #{$spacing-md};
+  padding-bottom: #{$spacing-md};
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: 7px 20px;
+  border-radius: 20px;
+  font-size: #{$font-size-sm};
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  &.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+}
+
+.search-bar {
+  margin-bottom: #{$spacing-sm};
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  max-width: 560px;
+}
+
+.search-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: #{$spacing-md};
+  font-size: #{$font-size-sm};
+  color: var(--color-text-secondary);
+  .search-source {
+    color: var(--color-text-secondary);
+    font-size: #{$font-size-xs};
+  }
+}
+</style>
+
+<style lang="scss">
+/* 简介 tooltip 宽度限制（ElementUI tooltip 挂载在 body 下，需用非 scoped 样式） */
+.el-tooltip__popper.abstract-tooltip {
+  max-width: 480px !important;
+  line-height: 1.6;
+  word-wrap: break-word;
+  word-break: break-all;
+}
+</style>
+
+<style lang="scss" scoped>
+.cell-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 </style>

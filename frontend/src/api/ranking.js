@@ -20,7 +20,29 @@ export function getAvailableDates(platform, rankType) {
   return request({ url: '/ranking/available-dates', method: 'get', params: { platform, rankType } })
 }
 
+/** 搜索小说（按书名/作者，支持全平台或指定平台） */
+export function searchBooks(params) {
+  return request({ url: '/ranking/search', method: 'get', params })
+}
+
 /** 下载整本小说到素材库 */
 export function downloadBook(data) {
   return request({ url: '/ranking/download-book', method: 'post', data, timeout: 360000 })
+}
+
+/**
+ * 下载小说文件（TXT / HTML / PDF）
+ * @param {string} bookId - 书籍 ID
+ * @param {string} format - 格式: 'txt' | 'html' | 'pdf'
+ * @param {number} maxChapters - 最大章节数 (0 = 全部)
+ * @returns {Promise<Blob>} 文件 Blob
+ */
+export function downloadFile(bookId, format, maxChapters = 0) {
+  return request({
+    url: '/ranking/download-file',
+    method: 'get',
+    params: { bookId, format, maxChapters },
+    responseType: 'blob',
+    timeout: 360000
+  })
 }

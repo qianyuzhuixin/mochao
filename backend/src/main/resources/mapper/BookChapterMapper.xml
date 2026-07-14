@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mochao.module.book.mapper.BookChapterMapper">
+
+    <insert id="batchInsert" parameterType="list">
+        INSERT INTO t_book_chapter (book_id, chapter_idx, title, content, word_count, created_at)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.bookId}, #{item.chapterIdx}, #{item.title}, #{item.content}, #{item.wordCount}, #{item.createdAt})
+        </foreach>
+    </insert>
+
+</mapper>

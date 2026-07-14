@@ -70,6 +70,17 @@ service.interceptors.response.use(
       if (isAdminPath) {
         router.push('/')
       }
+    } else if (status === 429) {
+      // 限流提示 — 优先取后端返回的中文消息，fallback 带等待秒数
+      const backendMsg = error.response.data && error.response.data.message
+      const retryAfter = error.response.headers['retry-after']
+      if (backendMsg) {
+        Message.warning(backendMsg)
+      } else if (retryAfter) {
+        Message.warning(`操作过于频繁，请等待 ${retryAfter} 秒后再试`)
+      } else {
+        Message.warning('操作过于频繁，请稍后再试')
+      }
     } else if (status === 404) {
       Message.error('请求资源不存在')
     } else if (status >= 500) {

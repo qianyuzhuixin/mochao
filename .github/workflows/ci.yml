@@ -1,0 +1,121 @@
+name: MoChao CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ==================== 后端构建与测试 ====================
+  backend:
+    name: Backend Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Maven Build & Test
+        run: mvn clean verify -B
+        env:
+          # CI 环境使用强密钥（仅用于测试，不会部署到生产）
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET || '7d3f8a2b9c1e4f6a0d5e7b3c8f2a9d1e4b6c0f7a3d8e2b9c1f4a6d0e7b3c8f2a' }}
+          AI_API_KEY: 'test-placeholder'
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/target/surefire-reports/
+
+  # ==================== 前端构建与测试 ====================
+  frontend:
+    name: Frontend Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Linter
+        run: npm run lint --if-present
+
+      - name: Run Unit Tests
+        run: npm run test:unit --if-present
+
+      - name: Build Production
+        run: npm run build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+  # ==================== Scraper 检查 ====================
+  scraper:
+    name: Scraper Syntax Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scraper
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: scraper/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Syntax Check
+        run: node -c server.js
+
+  # ==================== 代码质量门禁 ====================
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, scraper]
+    if: always()
+
+    steps:
+      - name: Check All Jobs Passed
+        run: |
+          echo "Backend: ${{ needs.backend.result }}"
+          echo "Frontend: ${{ needs.frontend.result }}"
+          echo "Scraper: ${{ needs.scraper.result }}"
+          if [[ "${{ needs.backend.result }}" == "failure" || \
+                "${{ needs.frontend.result }}" == "failure" || \
+                "${{ needs.scraper.result }}" == "failure" ]]; then
+            echo "::error::Quality gate failed - one or more jobs did not pass"
+            exit 1
+          fi
+          echo "All quality checks passed!"

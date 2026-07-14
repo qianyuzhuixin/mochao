@@ -1,0 +1,49 @@
+# 测试环境配置 — 使用 H2 内存数据库，不依赖外部服务
+server:
+  port: 0  # 随机端口，避免冲突
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+  redis:
+    # 测试环境不需要 Redis，使用 mock 或禁用
+    host: localhost
+    port: 6379
+
+# 测试环境使用固定强密钥（仅用于测试，绝不部署到生产）
+jwt:
+  secret: 7d3f8a2b9c1e4f6a0d5e7b3c8f2a9d1e4b6c0f7a3d8e2b9c1f4a6d0e7b3c8f2a
+  expiration: 86400000
+
+ai:
+  provider: test
+  api-url: http://localhost:9999/mock-ai
+  api-key: test-key
+  model: test-model
+  max-tokens: 100
+  temperature: 0.1
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  global-config:
+    db-config:
+      table-prefix: t_
+      id-type: auto
+  configuration:
+    map-underscore-to-camel-case: true
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: test-access-key
+  secret-key: test-secret-key
+  bucket: test-bucket
+
+# 测试环境关闭限流，避免自动化测试被拦截
+rate-limit:
+  enabled: false
