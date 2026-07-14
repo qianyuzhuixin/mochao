@@ -350,8 +350,11 @@ public class BookServiceImpl implements BookService {
             entities.add(ch);
         }
         if (!entities.isEmpty()) {
-            for (BookChapter entity : entities) {
-                chapterMapper.insert(entity);
+            // 分批插入，每批最多 500 条，防止单条 SQL 超长
+            int batchSize = 500;
+            for (int i = 0; i < entities.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, entities.size());
+                chapterMapper.batchInsert(entities.subList(i, end));
             }
         }
     }

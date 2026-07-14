@@ -6,6 +6,7 @@ import com.mochao.module.ranking.dto.ScrapeResult;
 import com.mochao.module.ranking.entity.RankingSnapshot;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 榜单快照服务
@@ -31,4 +32,10 @@ public interface RankingService {
      * 获取某平台+榜单有数据的日期列表（用于前端日期选择器）
      */
     List<String> getAvailableDates(String platform, String rankType);
+
+    /**
+     * 按书名/作者关键词搜索（调用番茄小说实时搜索 API，仿 fanqienovel-downloader）
+     * @return 搜索结果列表，每项包含 bookName/author/platform/category/wordCount/coverUrl/bookUrl/bookId 等
+     */
+    List<Map<String, Object>> searchBooks(String keyword, String platform, int limit);
 }

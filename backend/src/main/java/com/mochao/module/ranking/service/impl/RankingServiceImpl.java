@@ -21,9 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -195,6 +193,44 @@ public class RankingServiceImpl implements RankingService {
         return snapshots.stream()
                 .map(s -> s.getSnapDate().toString())
                 .collect(Collectors.toList());
+    }
+
+    // ==================== 搜索 ====================
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> searchBooks(String keyword, String platform, int limit) {
+        // 调用 scraper 的番茄小说实时搜索 API（仿 fanqienovel-downloader）
+        String searchPlatform = (platform != null && !platform.isEmpty()) ? platform : "fanqie";
+        Map<String, Object> scraperResult = scraperClient.searchBooks(searchPlatform, keyword, 0, limit);
+        if (scraperResult == null || !Boolean.TRUE.equals(scraperResult.get("success"))) {
+            log.warn("番茄搜索API调用失败: {}", scraperResult != null ? scraperResult.get("error") : "null");
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> books = (List<Map<String, Object>>) scraperResult.get("books");
+        if (books == null || books.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 统一格式：为每个结果添加 platform 字段
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (Map<String, Object> b : books) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("bookId", b.getOrDefault("bookId", ""));
+            item.put("bookName", b.getOrDefault("bookName", ""));
+            item.put("author", b.getOrDefault("author", ""));
+            item.put("platform", searchPlatform);
+            item.put("category", b.getOrDefault("category", ""));
+            item.put("wordCount", b.getOrDefault("wordCount", 0));
+            item.put("coverUrl", b.getOrDefault("coverUrl", ""));
+            item.put("bookUrl", b.getOrDefault("bookUrl", ""));
+            item.put("intro", b.getOrDefault("abstract", ""));
+            item.put("status", b.getOrDefault("status", ""));
+            results.add(item);
+            if (results.size() >= limit) break;
+        }
+        return results;
     }
 
     // ==================== Redis 缓存 ====================

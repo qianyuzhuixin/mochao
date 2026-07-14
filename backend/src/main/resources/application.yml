@@ -34,7 +34,8 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: ${JWT_SECRET:}
+  # ⚠️ 必须通过环境变量 JWT_SECRET 配置强密钥（≥32字节），不再提供空值兜底
+  secret: ${JWT_SECRET}
   expiration: 86400000
 
 # ==================== AI 写作配置 ====================
@@ -54,6 +55,15 @@ ai:
   temperature: ${AI_TEMPERATURE:0.8}
   proxy-host: ${AI_PROXY_HOST:}
   proxy-port: ${AI_PROXY_PORT:0}
+
+# ==================== API 限流配置 ====================
+# 开发环境建议放宽或直接 enabled=false，生产环境保持严格
+# 可通过环境变量覆盖: RATE_LIMIT_ENABLED, RATE_LIMIT_AI_CAPACITY 等
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  ai-capacity: ${RATE_LIMIT_AI_CAPACITY:100}
+  auth-capacity: ${RATE_LIMIT_AUTH_CAPACITY:200}
+  general-capacity: ${RATE_LIMIT_GENERAL_CAPACITY:600}
 
 # ==================== 扫榜抓取服务 ====================
 # 独立 Node.js Playwright 服务地址（方案 B：用户触发式抓取）

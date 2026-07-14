@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mochao.common.result.Result;
 import com.mochao.common.result.ResultCode;
 import com.mochao.security.JwtAuthenticationFilter;
+import com.mochao.security.ratelimit.RateLimitFilter;
+import com.mochao.security.ratelimit.RateLimitProperties;
+import com.mochao.security.ratelimit.RateLimitService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -27,11 +30,17 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimitService rateLimitService;
+    private final RateLimitProperties rateLimitProperties;
     private final ObjectMapper objectMapper;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                         RateLimitService rateLimitService,
+                         RateLimitProperties rateLimitProperties,
                          ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.rateLimitService = rateLimitService;
+        this.rateLimitProperties = rateLimitProperties;
         this.objectMapper = objectMapper;
     }
 
@@ -85,6 +94,9 @@ public class SecurityConfig {
                 });
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // 🔧 限流过滤器 — 在 JWT 认证之后执行，基于 userId/IP 限流
+        // 当 rate-limit.enabled=false 时自动放行，不影响开发调试
+        http.addFilterAfter(new RateLimitFilter(rateLimitService, rateLimitProperties), JwtAuthenticationFilter.class);
 
         return http.build();
     }

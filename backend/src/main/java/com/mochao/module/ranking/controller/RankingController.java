@@ -18,6 +18,9 @@ import com.mochao.module.ranking.entity.RankingSnapshot;
 import com.mochao.module.ranking.service.RankingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -96,6 +99,32 @@ public class RankingController {
     }
 
     /**
+     * 搜索小说（调用番茄小说实时搜索 API，仿 fanqienovel-downloader）
+     */
+    @GetMapping("/search")
+    public Result<Map<String, Object>> searchBooks(@RequestParam String keyword,
+                                                    @RequestParam(defaultValue = "") String platform,
+                                                    @RequestParam(defaultValue = "20") int limit) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return Result.error(400, "搜索关键词不能为空");
+        }
+        limit = Math.max(1, Math.min(200, limit));
+
+        log.info("本地搜索: keyword={}, platform={}, limit={}", keyword, platform, limit);
+
+        List<Map<String, Object>> books = rankingService.searchBooks(keyword.trim(),
+                platform != null && !platform.isEmpty() ? platform : null, limit);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("books", books);
+        data.put("total", books.size());
+        data.put("hasMore", false);
+        data.put("source", "fanqie-api");
+
+        return Result.success(data);
+    }
+
+    /**
      * 下载整本小说到素材库
      * @param body { platform, bookId, target: "personal"|"library", maxChapters? }
      */
@@ -145,14 +174,14 @@ public class RankingController {
         dto.setContent(fullText);
         dto.setDifficulty("medium");
 
-        // 构造章节列表
+        // 构造章节列表 — scraper 返回的 chapters[0] 为"书籍信息"(第0章)，正文从第1章开始
         List<Map<String, Object>> chapterList = (List<Map<String, Object>>) downloadResult.get("chapters");
         if (chapterList != null && !chapterList.isEmpty()) {
             List<ChapterItem> chapters = new ArrayList<>();
             for (int i = 0; i < chapterList.size(); i++) {
                 Map<String, Object> ch = chapterList.get(i);
                 ChapterItem item = new ChapterItem();
-                item.setIndex(i);
+                item.setIndex(i);  // 第0章=书籍信息，第1章=正文第一章
                 item.setTitle((String) ch.get("title"));
                 item.setContent((String) ch.get("content"));
                 Object wc = ch.get("wordCount");
@@ -161,6 +190,10 @@ public class RankingController {
             }
             dto.setChapters(chapters);
         }
+
+        // 中止信息 — 单章失败时返回已成功部分 + 告知用户中止原因
+        Boolean aborted = (Boolean) downloadResult.get("aborted");
+        String abortReason = (String) downloadResult.getOrDefault("abortReason", "");
 
         // 3. 保存到数据库
         Long userId = SecurityUtils.getCurrentUserId();
@@ -181,14 +214,79 @@ public class RankingController {
         result.put("successCount", downloadResult.get("successCount"));
         result.put("totalWords", downloadResult.get("totalWords"));
         result.put("target", target);
-        result.put("message", String.format("《%s》已下载到%s（%s章/%s字）",
+        String message = String.format("《%s》已下载到%s（%s章/%s字）",
                 bookName,
                 "library".equals(target) ? "内置书库" : "个人素材",
                 downloadResult.get("downloadedChapters"),
-                downloadResult.get("totalWords")));
+                downloadResult.get("totalWords"));
+        if (Boolean.TRUE.equals(aborted) && abortReason != null && !abortReason.isEmpty()) {
+            message += "（部分下载：" + abortReason + "）";
+        }
+        result.put("message", message);
+        result.put("aborted", aborted);
+        result.put("abortReason", abortReason);
+        Object failedChapters = downloadResult.get("failedChapters");
+        result.put("failedChapters", failedChapters != null ? failedChapters : 0);
 
-        log.info("下载完成: {} → {} (bookId={})", bookName, target, savedBook.getId());
+        log.info("下载完成: {} → {} (bookId={}, aborted={})", bookName, target, savedBook.getId(), aborted);
         return Result.success(result);
+    }
+
+    /**
+     * 下载小说文件（TXT / HTML / PDF）
+     * 直接返回可下载的文件流，不存入数据库
+     *
+     * @param bookId 书籍 ID（番茄小说 bookId）
+     * @param format 输出格式：txt / html / pdf
+     * @param maxChapters 最大下载章节数（0 = 全部，默认 0）
+     */
+    @GetMapping("/download-file")
+    public ResponseEntity<byte[]> downloadFile(@RequestParam String bookId,
+                                                @RequestParam(defaultValue = "txt") String format,
+                                                @RequestParam(defaultValue = "0") int maxChapters) {
+        if (bookId == null || bookId.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        // 校验格式
+        if (!"txt".equals(format) && !"html".equals(format) && !"pdf".equals(format)) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        log.info("下载文件: bookId={}, format={}, maxChapters={}", bookId, format, maxChapters);
+
+        try {
+            // 调用 scraper 下载并转换格式
+            ResponseEntity<byte[]> scraperResp = scraperClient.downloadFile(
+                    "fanqie", bookId.trim(), format, maxChapters);
+
+            byte[] fileBytes = scraperResp.getBody();
+            if (fileBytes == null || fileBytes.length == 0) {
+                return ResponseEntity.internalServerError().body(null);
+            }
+
+            // 从 scraper 响应头获取 Content-Type 和文件名
+            HttpHeaders scraperHeaders = scraperResp.getHeaders();
+            MediaType contentType = scraperHeaders.getContentType();
+            String contentDisposition = scraperHeaders.getFirst(HttpHeaders.CONTENT_DISPOSITION);
+
+            // 构建响应
+            HttpHeaders respHeaders = new HttpHeaders();
+            if (contentType != null) {
+                respHeaders.setContentType(contentType);
+            }
+            if (contentDisposition != null) {
+                respHeaders.set(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+            }
+            respHeaders.setContentLength(fileBytes.length);
+
+            log.info("文件下载完成: {} bytes, type={}", fileBytes.length, contentType);
+
+            return ResponseEntity.ok().headers(respHeaders).body(fileBytes);
+        } catch (Exception e) {
+            log.error("文件下载失败: bookId={}, format={}, error={}", bookId, format, e.getMessage());
+            return ResponseEntity.internalServerError().body(null);
+        }
     }
 
     /**
@@ -211,8 +309,9 @@ public class RankingController {
         book.setUpdatedAt(LocalDateTime.now());
         bookMapper.insert(book);
 
-        // 保存章节
+        // 批量保存章节
         if (dto.getChapters() != null && !dto.getChapters().isEmpty()) {
+            List<BookChapter> entities = new ArrayList<>();
             for (int i = 0; i < dto.getChapters().size(); i++) {
                 ChapterItem ch = dto.getChapters().get(i);
                 BookChapter chapter = new BookChapter();
@@ -222,7 +321,13 @@ public class RankingController {
                 chapter.setContent(ch.getContent());
                 chapter.setWordCount(ch.getWordCount() != null ? ch.getWordCount() : 0);
                 chapter.setCreatedAt(LocalDateTime.now());
-                bookChapterMapper.insert(chapter);
+                entities.add(chapter);
+            }
+            // 分批插入，每批最多 500 条
+            int batchSize = 500;
+            for (int i = 0; i < entities.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, entities.size());
+                bookChapterMapper.batchInsert(entities.subList(i, end));
             }
         }
 

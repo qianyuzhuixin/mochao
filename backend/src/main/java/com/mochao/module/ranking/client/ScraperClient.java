@@ -13,6 +13,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import org.springframework.http.ResponseEntity;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -69,6 +71,41 @@ public class ScraperClient {
     }
 
     /**
+     * 搜索小说
+     * @param platform 平台 (目前仅支持 fanqie)
+     * @param keyword 搜索关键词（书名/作者）
+     * @param page 页码 (0 起始)
+     * @param pageSize 每页数量
+     * @return 搜索结果 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> searchBooks(String platform, String keyword, int page, int pageSize) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("platform", platform);
+        body.put("keyword", keyword);
+        body.put("page", page);
+        body.put("pageSize", pageSize);
+
+        log.info("搜索小说: {}/{} keyword={}, page={}", platform, keyword, page);
+
+        try {
+            String response = restTemplate.postForObject(
+                    scraperBaseUrl + "/search",
+                    body,
+                    String.class
+            );
+            return objectMapper.readValue(response, Map.class);
+        } catch (Exception e) {
+            log.error("搜索小说失败: {}/{} - {}", platform, keyword, e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", "搜索服务调用失败");
+            errorResult.put("detail", e.getMessage());
+            return errorResult;
+        }
+    }
+
+    /**
      * 下载整本小说
      * @param platform 平台 (目前仅支持 fanqie)
      * @param bookId 书籍 ID
@@ -103,5 +140,32 @@ public class ScraperClient {
             errorResult.put("detail", e.getMessage());
             return errorResult;
         }
+    }
+
+    /**
+     * 下载文件（txt/html/pdf），返回原始字节流
+     * @param platform 平台
+     * @param bookId 书籍 ID
+     * @param format 输出格式 (txt|html|pdf)
+     * @param maxChapters 最多下载章节数 (0 = 全部)
+     * @return ResponseEntity 包含文件字节、Content-Type 和 Content-Disposition
+     */
+    public ResponseEntity<byte[]> downloadFile(String platform, String bookId, String format, int maxChapters) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("platform", platform);
+        body.put("bookId", bookId);
+        body.put("format", format);
+        body.put("maxChapters", maxChapters);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        log.info("下载文件: {}/{} format={} maxChapters={}", platform, bookId, format, maxChapters);
+
+        return downloadRestTemplate.postForEntity(
+                scraperBaseUrl + "/download-file",
+                new HttpEntity<>(body, headers),
+                byte[].class
+        );
     }
 }

@@ -1,6 +1,7 @@
 package com.mochao.security;
 
 import com.mochao.common.constant.Constants;
+import io.jsonwebtoken.Claims;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,9 +34,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-            Long userId = jwtTokenProvider.getUserIdFromToken(token);
-            String username = jwtTokenProvider.getUsernameFromToken(token);
-            String role = jwtTokenProvider.getRoleFromToken(token);
+            // 🔧 一次解析获取全部 Claims，避免 3 次重复 parseClaimsJws
+            Claims claims = jwtTokenProvider.parseClaims(token);
+
+            Long userId = Long.parseLong(claims.getSubject());
+            String username = claims.get("username", String.class);
+            String role = claims.get("role", String.class);
 
             // 根据token中的角色设置对应的GrantedAuthority
             List<SimpleGrantedAuthority> authorities = new ArrayList<>();

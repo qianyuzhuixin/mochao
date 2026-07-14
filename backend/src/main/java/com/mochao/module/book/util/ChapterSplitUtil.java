@@ -22,6 +22,7 @@ public class ChapterSplitUtil {
      *   Chapter X / CHAPTER X / chapter x
      *   纯数字：1. / 1、 / 1 / 一、 / 二.
      *   特殊章节：楔子 / 序章 / 序言 / 前言 / 引子 / 引言 / 终章 / 大结局 / 尾声 / 后记 / 番外 / 番外篇
+     *   scraper 格式：=== 第X章 标题 ===
      */
     public static List<ChapterItem> split(String text) {
         List<ChapterItem> chapters = new ArrayList<>();
@@ -31,6 +32,12 @@ public class ChapterSplitUtil {
 
         // 统一换行符
         String normalized = text.replace("\r\n", "\n").replace("\r", "\n");
+
+        // 策略0：scraper 专用的 === 第X章 标题 === 格式
+        List<ChapterItem> scraperChapters = splitByScraperSeparator(normalized);
+        if (!scraperChapters.isEmpty()) {
+            return scraperChapters;
+        }
 
         // 策略1：分隔线拆分（如 --- 或 === 分隔线）
         Pattern separatorPattern = Pattern.compile("^[-=]{10,}$", Pattern.MULTILINE);
@@ -90,7 +97,7 @@ public class ChapterSplitUtil {
         }
 
         if (validParts.size() >= 1 || prefaceItem != null) {
-            String titlePattern = "^\\s*(?:第\\s*[零一二两三四五六七八九十百千万\\d\uff10-\uff19]+\\s*[章节卷集部篇回]|" +
+            String titlePattern = "^\\s*(?:第\\s*[零一二两三四五六七八九十百千万\\d０-９]+\\s*[章节卷集部篇回]|" +
                 "Chapter\\s+\\d+|CHAPTER\\s+\\d+|" +
                 "楔子|序章|序言|前言|引子|引言|终章|大结局|尾声|后记|番外|番外篇)";
             Pattern titleRegex = Pattern.compile(titlePattern, Pattern.CASE_INSENSITIVE);
@@ -141,7 +148,7 @@ public class ChapterSplitUtil {
         }
 
         // 策略2：正则匹配"第X章"等传统章节标题
-        String numPattern = "[零一二两三四五六七八九十百千万\\d\uff10\uff11\uff12\uff13\uff14\uff15\uff16\uff17\uff18\uff19]";
+        String numPattern = "[零一二两三四五六七八九十百千万\\d０１２３４５６７８９]";
         String chSuffix = "[章节卷集部篇回]";
 
         String chapterPattern =
@@ -211,6 +218,71 @@ public class ChapterSplitUtil {
                     chapters.get(j).setIndex(j);
                 }
             }
+        }
+
+        return chapters;
+    }
+
+    /**
+     * 策略0：识别 scraper 生成的 === 第X章 标题 === 格式
+     *
+     * 格式示例：
+     *   === 第88章 幸存者 ===
+     *   
+     *   章节内容...
+     *   
+     *   === 第89章 破碎世界的馈赠 ===
+     */
+    private static List<ChapterItem> splitByScraperSeparator(String text) {
+        List<ChapterItem> chapters = new ArrayList<>();
+
+        // 匹配 === 标题 === 格式，两侧等号数量 ≥ 3，中间为标题
+        Pattern pattern = Pattern.compile(
+                "^\\s*={3,}\\s+(.+?)\\s+={3,}\\s*$",
+                Pattern.MULTILINE
+        );
+        Matcher matcher = pattern.matcher(text);
+
+        List<int[]> positions = new ArrayList<>();
+        List<String> titles = new ArrayList<>();
+        while (matcher.find()) {
+            positions.add(new int[]{matcher.start(), matcher.end()});
+            titles.add(matcher.group(1).trim());
+        }
+
+        if (positions.isEmpty()) {
+            return chapters;
+        }
+
+        // 如果匹配数量太少（只有 1 个），可能是巧合，交给其他策略处理
+        if (positions.size() < 2) {
+            return chapters;
+        }
+
+        for (int i = 0; i < positions.size(); i++) {
+            int titleLineEnd = positions.get(i)[1];
+
+            // 跳过标题行后的空行
+            int contentStart = titleLineEnd;
+            while (contentStart < text.length() && text.charAt(contentStart) == '\n') {
+                contentStart++;
+            }
+
+            int contentEnd = (i + 1 < positions.size()) ? positions.get(i + 1)[0] : text.length();
+            String content = text.substring(contentStart, contentEnd).trim();
+
+            if (content.isEmpty()) {
+                continue;
+            }
+
+            ChapterItem item = new ChapterItem();
+            // scraper 格式的索引通常就是章节顺序，1-based
+            item.setIndex(i + 1);
+            item.setTitle(titles.get(i));
+            item.setContent(content);
+            item.setWordCount(content.replaceAll("\\s+", "").length());
+            item.setPreview(getPreview(content, 100));
+            chapters.add(item);
         }
 
         return chapters;
