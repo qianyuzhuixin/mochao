@@ -125,6 +125,20 @@ public class RankingController {
     }
 
     /**
+     * 清洗历史乱码数据（管理员手动触发 — 兜底操作）
+     * 系统已具备自动自愈机制（查询时自动检测+异步清洗+4:00定时巡检），
+     * 此端点仅作为管理员兜底手段
+     */
+    @PostMapping("/clean-garbled")
+    public Result<Map<String, Object>> cleanGarbledData() {
+        if (!SecurityUtils.isAdmin()) {
+            return Result.error(403, "仅管理员可执行乱码清洗");
+        }
+        Map<String, Object> stats = rankingService.cleanGarbledData();
+        return Result.success(stats);
+    }
+
+    /**
      * 下载整本小说到素材库
      * @param body { platform, bookId, target: "personal"|"library", maxChapters? }
      */

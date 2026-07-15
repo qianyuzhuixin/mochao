@@ -507,7 +507,7 @@ public class AiServiceImpl implements AiService {
                         double temperature, String proxyHost, Integer proxyPort) {
             this.apiUrl = apiUrl;
             this.apiKey = apiKey;
-            this.model = apiKey;
+            this.model = model;
             this.maxTokens = maxTokens;
             this.temperature = temperature;
             this.proxyHost = proxyHost;

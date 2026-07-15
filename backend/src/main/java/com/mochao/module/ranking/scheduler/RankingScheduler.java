@@ -215,4 +215,34 @@ public class RankingScheduler {
 
         log.info("========= 定时抓取任务完成：成功 {} / 失败 {} =========", successCount, failCount);
     }
+
+    /**
+     * 每天凌晨 4:00 执行乱码巡检（在 3:00 抓取完成后 1 小时）
+     * 扫描所有当天数据，发现乱码则自动清洗 + 重抓
+     */
+    @Scheduled(cron = "0 0 4 * * ?")
+    public void autoCleanGarbled() {
+        log.info("========= 定时乱码巡检开始（{}）=========", java.time.LocalDateTime.now());
+
+        int healedCount = 0;
+        int cleanCount = 0;
+
+        for (String[] task : AUTO_SCRAPE_TASKS) {
+            String platform = task[0];
+            String rankType = task[1];
+            try {
+                if (rankingService.hasGarbledData(platform, rankType)) {
+                    log.warn("[巡检] 发现乱码数据: {} {}，触发自愈", platform, rankType);
+                    rankingService.selfHealAsync(platform, rankType);
+                    healedCount++;
+                } else {
+                    cleanCount++;
+                }
+            } catch (Exception e) {
+                log.error("[巡检] {} {} 检测异常", platform, rankType, e);
+            }
+        }
+
+        log.info("========= 定时乱码巡检完成：干净 {} / 自愈 {} =========", cleanCount, healedCount);
+    }
 }
