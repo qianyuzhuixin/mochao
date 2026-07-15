@@ -39,6 +39,19 @@ const FANQIE_OVERALL_LABELS = {
 };
 
 /**
+ * 检测字符串是否包含 PUA 区字符（字体反爬乱码）
+ * PUA: U+E000 ~ U+F8FF (Private Use Area)
+ */
+function hasPuaChars(str) {
+  if (!str) return false;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code >= 0xE000 && code <= 0xF8FF) return true;
+  }
+  return false;
+}
+
+/**
  * 从番茄榜单页提取书籍列表（仅 bookId + 数字指标）
  * 文本字段（书名/作者/简介）因字体混淆不可靠，需从详情页补取
  */
@@ -57,9 +70,9 @@ function extractFanqieBookIdsFromRank(html) {
       lastChapterTitle: b.lastChapterTitle || '',
       currentPos: parseInt(b.currentPos) || 0,
       category: b.category || '',
-      // 列表页的文本字段可能有乱码，仅做初步记录
-      bookNameRaw: b.bookName || '',
-      authorRaw: b.author || '',
+      // 列表页的文本字段可能有乱码，仅做初步记录（仅在不含PUA字符时才保留）
+      bookNameRaw: hasPuaChars(b.bookName) ? '' : (b.bookName || ''),
+      authorRaw: hasPuaChars(b.author) ? '' : (b.author || ''),
     }));
 }
 
@@ -136,12 +149,15 @@ async function scrapeFanqie(rankType) {
   }
 
   // Step 3: 合并结果，优先使用详情页的明文字段
+  // 关键：详情页失败时不 fallback 到乱码 raw 数据，而是丢弃该条目
   const items = bookIdList
     .map((rank) => {
       const detail = detailMap[rank.bookId] || {};
+      const bookName = detail.bookName || rank.bookNameRaw || '';
+      const author = detail.author || rank.authorRaw || '';
       return {
-        bookName: detail.bookName || rank.bookNameRaw || '',
-        author: detail.author || rank.authorRaw || '',
+        bookName,
+        author,
         category: detail.categoryV2 || rank.category || '',
         wordCount: detail.wordNumber || rank.wordNumber,
         hotValue: detail.readCount || rank.read_count,
@@ -153,7 +169,8 @@ async function scrapeFanqie(rankType) {
         lastChapter: detail.lastChapterTitle || rank.lastChapterTitle,
       };
     })
-    .filter((b) => b.bookName && b.rankNo > 0);
+    // 过滤掉含 PUA 乱码字符的结果（绝不让乱码数据入库）
+    .filter((b) => b.bookName && b.rankNo > 0 && !hasPuaChars(b.bookName) && !hasPuaChars(b.author));
 
   const resolved = items.filter((b) => b.author && !b.author.includes('\uE000')).length;
   console.log(`[fanqie]   ✓ ${items.length} 本（明文 ${resolved}/${items.length}）`);
@@ -209,9 +226,11 @@ async function scrapeFanqieCategory(rankType) {
   const items = bookIdList
     .map((rank) => {
       const detail = detailMap[rank.bookId] || {};
+      const bookName = detail.bookName || rank.bookNameRaw || '';
+      const author = detail.author || rank.authorRaw || '';
       return {
-        bookName: detail.bookName || rank.bookNameRaw || '',
-        author: detail.author || rank.authorRaw || '',
+        bookName,
+        author,
         category: detail.categoryV2 || catName,
         wordCount: detail.wordNumber || rank.wordNumber,
         hotValue: detail.readCount || rank.read_count,
@@ -223,7 +242,8 @@ async function scrapeFanqieCategory(rankType) {
         lastChapter: detail.lastChapterTitle || rank.lastChapterTitle,
       };
     })
-    .filter((b) => b.bookName && b.rankNo > 0);
+    // 过滤掉含 PUA 乱码字符的结果（绝不让乱码数据入库）
+    .filter((b) => b.bookName && b.rankNo > 0 && !hasPuaChars(b.bookName) && !hasPuaChars(b.author));
 
   console.log(`[fanqie]   ✓ ${items.length} 本`);
   return items;
@@ -307,6 +327,7 @@ module.exports = {
   FANQIE_CATEGORIES,
   FANQIE_OVERALL_RANK_URLS,
   FANQIE_OVERALL_LABELS,
+  hasPuaChars,
   scrapeFanqie,
   scrapeFanqieCategory,
   fetchFanqieDetail,

@@ -20,8 +20,8 @@ node_modules/
 /dist
 /build
 
-# 包管理器的锁文件（可选，根据团队习惯）[reference:8][reference:9]
-package-lock.json
+# 锁文件说明：package-lock.json 必须 TRACK（npm ci 依赖它保证 CI/CD 依赖一致性）
+# yarn.lock 和 pnpm-lock.yaml 根据实际使用的包管理器决定是否追踪
 yarn.lock
 pnpm-lock.yaml
 
@@ -75,6 +75,10 @@ yarn-error.log*
 .env.local
 .env.*.local
 .env
+
+# ========== Scraper 运行时缓存 ==========
+# Cookie 缓存（含敏感 session 信息）
+cookie_cache.json
 
 # ========== 用户上传文件 ==========
 uploads/
