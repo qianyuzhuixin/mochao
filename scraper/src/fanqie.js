@@ -161,7 +161,7 @@ async function scrapeFanqie(rankType) {
         category: detail.categoryV2 || rank.category || '',
         wordCount: detail.wordNumber || rank.wordNumber,
         hotValue: detail.readCount || rank.read_count,
-        intro: (detail.abstract || '').slice(0, 200),
+        intro: detail.abstract || '',
         coverUrl: detail.thumbUri || '',
         bookUrl: `https://fanqienovel.com/page/${rank.bookId}`,
         rankNo: rank.currentPos,
@@ -234,7 +234,7 @@ async function scrapeFanqieCategory(rankType) {
         category: detail.categoryV2 || catName,
         wordCount: detail.wordNumber || rank.wordNumber,
         hotValue: detail.readCount || rank.read_count,
-        intro: (detail.abstract || '').slice(0, 200),
+        intro: detail.abstract || '',
         coverUrl: detail.thumbUri || '',
         bookUrl: `https://fanqienovel.com/page/${rank.bookId}`,
         rankNo: rank.currentPos,
@@ -315,7 +315,7 @@ async function searchFanqieBooks(keyword, page = 0, pageSize = 10) {
     readCount: 0,                               // 此接口不返回阅读量
     coverUrl:  item.thumb_url || item.audio_thumb_uri || '',
     status:    item.creation_status === '1' ? '连载中' : '',
-    abstract:  (item.abstract || '').slice(0, 300),
+    abstract:  item.abstract || '',
     bookUrl:   item.book_id ? `https://fanqienovel.com/page/${item.book_id}` : '',
     score:     item.score || '',
   }));

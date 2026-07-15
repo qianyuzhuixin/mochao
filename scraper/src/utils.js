@@ -47,15 +47,18 @@ const MOBILE_HEADERS = {
 function fetchText(url, headers = PC_HEADERS, redirects = 3, encoding = 'utf8') {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
+    const isHttps = parsed.protocol === 'https:';
+    const transport = isHttps ? https : http;
     const opts = {
       hostname: parsed.hostname,
+      port: parsed.port || (isHttps ? 443 : 80),
       path: parsed.pathname + parsed.search,
       headers,
       timeout: 15000,
       insecureHTTPParser: true,  // 七猫等站点 CDN 可能返回非标准 HTTP 头
     };
 
-    const req = https.get(opts, (res) => {
+    const req = transport.get(opts, (res) => {
       if (
         redirects > 0 &&
         res.statusCode >= 300 &&
@@ -207,12 +210,73 @@ function logTop3(items, platform) {
   });
 }
 
+/**
+ * HTTPS/HTTP POST 请求 — 用于书源搜索（大多数笔趣阁系书源用 POST 搜索）
+ * @param {string} url 请求 URL
+ * @param {string} body POST body（已序列化的字符串）
+ * @param {object} headers 请求头
+ * @param {number} timeout 超时 ms
+ * @returns {Promise<string>} 响应文本
+ */
+function postText(url, body, headers = PC_HEADERS, timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const isHttps = parsed.protocol === 'https:';
+    const transport = isHttps ? https : http;
+    const opts = {
+      hostname: parsed.hostname,
+      port: parsed.port || (isHttps ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+        'Accept-Encoding': 'identity',
+      },
+      timeout,
+    };
+
+    const req = transport.request(opts, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        const nextUrl = new URL(res.headers.location, url).toString();
+        fetchText(nextUrl, headers, 3, 'utf8').then(resolve, reject);
+        return;
+      }
+      const chunks = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
+      res.on('end', () => {
+        let buf = Buffer.concat(chunks);
+        const ce = res.headers['content-encoding'] || '';
+        if (ce.includes('gzip')) {
+          try { buf = zlib.gunzipSync(buf); } catch (e) {
+            reject(new Error('gzip decompress failed: ' + e.message));
+            return;
+          }
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        resolve(buf.toString('utf8'));
+      });
+    });
+
+    req.on('timeout', () => { req.destroy(new Error('request timeout')); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 module.exports = {
   PC_HEADERS,
   GBK_HEADERS,
   MOBILE_HEADERS,
   fetchText,
   httpFetchText,
+  postText,
   extractInitialState,
   batchRun,
   logTop3,

@@ -42,10 +42,10 @@
               <el-select
                 v-model="searchPlatform"
                 slot="prepend"
-                placeholder="全平台"
-                style="width:120px"
+                style="width:140px"
               >
-                <el-option label="全平台" value="" />
+                <el-option label="全平台搜索" value="sonovel" />
+                <el-option label="榜单快照" value="" />
                 <el-option
                   v-for="p in platforms"
                   :key="p.value"
@@ -53,7 +53,7 @@
                   :value="p.value"
                 />
               </el-select>
-              <el-button slot="append" icon="el-icon-search" @click="handleSearch">搜索</el-button>
+              <el-button slot="append" icon="el-icon-search" :loading="searchLoading" @click="handleSearch">搜索</el-button>
             </el-input>
           </div>
         </div>
@@ -168,7 +168,7 @@
       <div v-if="viewMode === 'search' && !loading" class="search-result-header">
         <span v-if="searchKeyword">搜索 "{{ searchKeyword }}"：共 {{ total }} 条结果</span>
         <span v-else>请输入关键词开始搜索</span>
-        <span class="search-source">数据来源：番茄小说实时搜索</span>
+        <span class="search-source">{{ searchSourceLabel }}</span>
       </div>
 
       <div v-if="loading" class="loading-wrap">
@@ -176,16 +176,17 @@
         <span>加载中...</span>
       </div>
 
-      <template v-else-if="tableData.length > 0">
+      <template v-else-if="displayData.length > 0">
         <div class="result-header">
           <span v-if="viewMode === 'ranking'">共 {{ total }} 条记录</span>
           <span class="result-date" v-if="snapDate && viewMode === 'ranking'">快照日期：{{ snapDate }}</span>
         </div>
-        <el-table :data="tableData" stripe size="small" highlight-current-row>
-          <el-table-column v-if="viewMode === 'ranking'" prop="rankNo" label="排名" width="60" sortable />
-          <el-table-column v-if="viewMode === 'search'" prop="platform" label="平台" width="100">
+        <el-table :data="displayData" stripe size="small" highlight-current-row>
+          <el-table-column v-if="viewMode === 'ranking'" prop="rankNo" label="排名" width="80" sortable />
+          <el-table-column v-if="viewMode === 'search'" label="来源" width="120">
             <template #default="{ row }">
-              {{ platformLabel(row.platform) }}
+              <el-tag v-if="row.resultType === 'sonovel'" size="mini" type="warning" effect="plain">{{ row.sourceName }}</el-tag>
+              <span v-else>{{ platformLabel(row.platform) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="bookName" label="书名" min-width="180" show-overflow-tooltip>
@@ -206,7 +207,7 @@
               {{ formatWordCount(row.wordCount) }}
             </template>
           </el-table-column>
-          <el-table-column label="简介" min-width="200">
+          <el-table-column label="简介" min-width="280">
             <template #default="{ row }">
               <el-tooltip
                 v-if="row.intro"
@@ -232,21 +233,42 @@
                   <i class="el-icon-download" /> 下载<i class="el-icon-arrow-down el-icon--right" />
                 </el-button>
                 <el-dropdown-menu slot="dropdown">
-                  <el-dropdown-item command="txt" icon="el-icon-document">
-                    TXT 文本
-                  </el-dropdown-item>
-                  <el-dropdown-item command="html" icon="el-icon-notebook-1">
-                    HTML 网页
-                  </el-dropdown-item>
-                  <el-dropdown-item command="pdf" icon="el-icon-files">
-                    PDF 电子书
-                  </el-dropdown-item>
-                  <el-dropdown-item command="personal" icon="el-icon-user" divided>
-                    下载到个人素材
-                  </el-dropdown-item>
-                  <el-dropdown-item v-if="isAdmin" command="library" icon="el-icon-folder-opened">
-                    下载到内置书库
-                  </el-dropdown-item>
+                  <!-- so-novel 结果：文件格式 + 书库下载 -->
+                  <template v-if="row.resultType === 'sonovel'">
+                    <el-dropdown-item command="sonovel-txt" icon="el-icon-document">
+                      TXT 文本
+                    </el-dropdown-item>
+                    <el-dropdown-item command="sonovel-html" icon="el-icon-notebook-1">
+                      HTML 网页
+                    </el-dropdown-item>
+                    <el-dropdown-item command="sonovel-pdf" icon="el-icon-files">
+                      PDF 电子书
+                    </el-dropdown-item>
+                    <el-dropdown-item command="sonovel-personal" icon="el-icon-user" divided>
+                      下载到个人素材
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="isAdmin" command="sonovel-library" icon="el-icon-folder-opened">
+                      下载到内置书库
+                    </el-dropdown-item>
+                  </template>
+                  <!-- 番茄/榜单结果：支持文件格式 + 书库下载 -->
+                  <template v-else>
+                    <el-dropdown-item command="txt" icon="el-icon-document">
+                      TXT 文本
+                    </el-dropdown-item>
+                    <el-dropdown-item command="html" icon="el-icon-notebook-1">
+                      HTML 网页
+                    </el-dropdown-item>
+                    <el-dropdown-item command="pdf" icon="el-icon-files">
+                      PDF 电子书
+                    </el-dropdown-item>
+                    <el-dropdown-item command="personal" icon="el-icon-user" divided>
+                      下载到个人素材
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="isAdmin" command="library" icon="el-icon-folder-opened">
+                      下载到内置书库
+                    </el-dropdown-item>
+                  </template>
                 </el-dropdown-menu>
               </el-dropdown>
               <span v-else class="no-action">—</span>
@@ -262,12 +284,22 @@
           :current-page.sync="page"
           @current-change="fetchData"
         />
+        <el-pagination
+          v-if="viewMode === 'search' && allSearchResults.length > 0"
+          class="pagination-wrap"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="allSearchResults.length"
+          :page-size.sync="searchPageSize"
+          :current-page.sync="searchPage"
+          :page-sizes="[10, 20, 50, 100]"
+          @size-change="searchPage = 1"
+        />
       </template>
 
       <div v-else class="empty-wrap">
         <i class="el-icon-document" />
         <p v-if="viewMode === 'search' && searchKeyword">未找到与 "{{ searchKeyword }}" 相关的小说</p>
-        <p v-else-if="viewMode === 'search'">输入书名或作者关键词，搜索已收录榜单中的小说</p>
+        <p v-else-if="viewMode === 'search'">选择搜索来源（全平台 / 番茄），输入书名或作者关键词</p>
         <p v-else-if="isToday">暂无数据，点击"立即抓取"获取今日榜单</p>
         <p v-else>该日期暂无数据</p>
       </div>
@@ -276,7 +308,7 @@
 </template>
 
 <script>
-import { getRanking, triggerScrape, checkTodayData, getAvailableDates, downloadBook, downloadFile, searchBooks } from '@/api/ranking'
+import { getRanking, triggerScrape, checkTodayData, getAvailableDates, downloadBook, downloadFile, searchBooks, sonovelSearch, sonovelDownloadBook, sonovelDownloadFile } from '@/api/ranking'
 import { mapGetters } from 'vuex'
 
 export default {
@@ -299,14 +331,19 @@ export default {
       hasTodayData: false,
       availableDates: [],
       downloadingBookIds: [],  // 正在下载的书籍 bookId 列表
+      sonovelDownloading: [],  // so-novel 正在下载的 bookUrl 列表
       downloadMsg: '',
       downloadMsgType: 'info',
 
       // 搜索模式
       viewMode: 'ranking',      // 'ranking' | 'search'
       searchKeyword: '',
-      searchPlatform: '',
+      searchPlatform: 'sonovel',  // 'sonovel' | 'fanqie' | '' | 各平台
       searchLoading: false,
+      searchEngine: '',          // 当前搜索使用的引擎: 'sonovel' | 'ranking' | ''
+      allSearchResults: [],      // 搜索全部结果（未分页）
+      searchPage: 1,             // 搜索当前页
+      searchPageSize: 20,        // 每页条数
 
       platforms: [
         { label: '起点中文网', value: 'qidian' },
@@ -504,6 +541,24 @@ export default {
     },
     showScrapeBtn() {
       return this.isToday && !this.hasTodayData
+    },
+    /** 搜索结果来源标签 */
+    searchSourceLabel() {
+      if (this.searchEngine === 'sonovel') {
+        return '数据来源：so-novel 全平台搜索（11 书源并发）'
+      }
+      if (this.searchEngine === 'ranking') {
+        return '数据来源：榜单快照'
+      }
+      return ''
+    },
+    /** 表格实际渲染数据：搜索模式用分页切片，榜单模式直接用 tableData */
+    displayData() {
+      if (this.viewMode === 'search') {
+        const start = (this.searchPage - 1) * this.searchPageSize
+        return this.allSearchResults.slice(start, start + this.searchPageSize)
+      }
+      return this.tableData
     }
   },
   async created() {
@@ -683,14 +738,22 @@ export default {
       return n.toLocaleString()
     },
 
-    /** 判断某行是否可下载（番茄平台 + 有 bookUrl） */
+    /** 判断某行是否可下载 */
     canDownload(row) {
+      // so-novel 结果：有 bookUrl + sourceName 即可下载
+      if (row.resultType === 'sonovel') {
+        return !!(row.bookUrl && row.sourceName)
+      }
+      // 番茄/榜单结果：需番茄平台 + 有 bookUrl
       const platform = row.platform || this.currentPlatform
       return platform === 'fanqie' && row.bookUrl
     },
 
     /** 判断某行是否正在下载 */
     isDownloading(row) {
+      if (row.resultType === 'sonovel') {
+        return this.sonovelDownloading.includes(row.bookUrl)
+      }
       const bookId = this.extractBookId(row)
       return bookId ? this.downloadingBookIds.includes(bookId) : false
     },
@@ -704,6 +767,21 @@ export default {
 
     /** 处理下载 */
     async handleDownload(target, row) {
+      // so-novel 文件格式下载（txt/html/pdf）
+      if (['sonovel-txt', 'sonovel-html', 'sonovel-pdf'].includes(target)) {
+        const format = target.replace('sonovel-', '')
+        await this.handleSonovelFileDownload(row, format)
+        return
+      }
+
+      // so-novel 下载到书库
+      if (target === 'sonovel-personal' || target === 'sonovel-library') {
+        const dlTarget = target === 'sonovel-library' ? 'library' : 'personal'
+        await this.handleSonovelDownload(row, dlTarget)
+        return
+      }
+
+      // 番茄/榜单下载：提取 bookId
       const bookId = this.extractBookId(row)
       if (!bookId) {
         this.$message.error('无法获取书籍ID')
@@ -744,6 +822,90 @@ export default {
       } finally {
         const idx = this.downloadingBookIds.indexOf(bookId)
         if (idx > -1) this.downloadingBookIds.splice(idx, 1)
+      }
+    },
+
+    /** so-novel 下载 */
+    async handleSonovelDownload(row, target) {
+      if (this.sonovelDownloading.includes(row.bookUrl)) {
+        this.$message.warning('正在下载中，请稍候')
+        return
+      }
+
+      this.sonovelDownloading.push(row.bookUrl)
+      this.downloadMsg = `正在从「${row.sourceName}」下载《${row.bookName}》，可能需要数分钟...`
+      this.downloadMsgType = 'info'
+
+      try {
+        const res = await sonovelDownloadBook({
+          bookUrl: row.bookUrl,
+          sourceName: row.sourceName,
+          target,
+          maxChapters: 0
+        })
+
+        this.downloadMsg = res.message || `《${row.bookName}》下载完成`
+        this.downloadMsgType = 'success'
+        this.$message.success(this.downloadMsg)
+      } catch (err) {
+        const errMsg = (err && err.message) || '下载失败，请确认抓取服务已启动'
+        this.downloadMsg = errMsg
+        this.downloadMsgType = 'error'
+        this.$message.error(errMsg)
+      } finally {
+        const idx = this.sonovelDownloading.indexOf(row.bookUrl)
+        if (idx > -1) this.sonovelDownloading.splice(idx, 1)
+      }
+    },
+
+    /**
+     * so-novel 下载文件到本地（TXT / HTML / PDF）
+     * 直接从书源下载章节并生成文件，不存入数据库
+     */
+    async handleSonovelFileDownload(row, format) {
+      if (this.sonovelDownloading.includes(row.bookUrl)) {
+        this.$message.warning('正在下载中，请稍候')
+        return
+      }
+
+      this.sonovelDownloading.push(row.bookUrl)
+      const formatLabel = { txt: 'TXT', html: 'HTML', pdf: 'PDF' }[format] || format
+      this.downloadMsg = `正在从「${row.sourceName}」下载《${row.bookName}》并生成${formatLabel}文件，可能需要数分钟...`
+      this.downloadMsgType = 'info'
+
+      try {
+        const blob = await sonovelDownloadFile({
+          bookUrl: row.bookUrl,
+          sourceName: row.sourceName,
+          format,
+          maxChapters: 0
+        })
+
+        // 从 blob 创建下载链接
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+
+        const safeName = row.bookName.replace(/[\\/:*?"<>|]/g, '_')
+        const extMap = { txt: 'txt', html: 'html', pdf: 'pdf' }
+        link.download = `${safeName} - ${row.author || '未知'}.${extMap[format]}`
+
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        this.downloadMsg = `《${row.bookName}》${formatLabel}文件下载完成`
+        this.downloadMsgType = 'success'
+        this.$message.success(this.downloadMsg)
+      } catch (err) {
+        const errMsg = (err && err.message) || '文件下载失败，请确认抓取服务已启动'
+        this.downloadMsg = errMsg
+        this.downloadMsgType = 'error'
+        this.$message.error(errMsg)
+      } finally {
+        const idx = this.sonovelDownloading.indexOf(row.bookUrl)
+        if (idx > -1) this.sonovelDownloading.splice(idx, 1)
       }
     },
 
@@ -800,12 +962,18 @@ export default {
       this.viewMode = mode
       if (mode === 'ranking') {
         this.searchKeyword = ''
+        this.searchEngine = ''
+        this.allSearchResults = []
+        this.searchPage = 1
         this.tableData = []
         this.total = 0
         this.fetchData()
       } else {
         this.tableData = []
+        this.allSearchResults = []
         this.total = 0
+        this.searchPage = 1
+        this.searchEngine = ''
       }
     },
 
@@ -817,18 +985,20 @@ export default {
       this.searchLoading = true
       this.loading = true
       try {
-        const res = await searchBooks({
-          keyword: kw,
-          platform: this.searchPlatform,
-          limit: 200
-        })
-        // res 可能是 { code, data: { books, total } } 或直接是 data
-        const data = (res && res.data) ? res.data : res
-        this.tableData = (data && data.books) ? data.books : []
-        this.total = (data && data.total != null) ? data.total : this.tableData.length
+        if (this.searchPlatform === 'sonovel') {
+          // 全平台搜索 → so-novel 引擎
+          await this.doSonovelSearch(kw)
+        } else if (this.searchPlatform === 'fanqie') {
+          // 番茄搜索 → 无结果自动回退 so-novel
+          await this.doFanqieSearchWithFallback(kw)
+        } else {
+          // 榜单快照搜索
+          await this.doRankingSearch(kw)
+        }
       } catch (err) {
-        this.tableData = []
+        this.allSearchResults = []
         this.total = 0
+        this.searchPage = 1
         this.$message.error('搜索失败：' + ((err && err.message) || '网络错误'))
       } finally {
         this.searchLoading = false
@@ -836,11 +1006,59 @@ export default {
       }
     },
 
+    /** so-novel 全平台搜索 */
+    async doSonovelSearch(kw) {
+      this.searchEngine = 'sonovel'
+      const res = await sonovelSearch({ keyword: kw })
+      const data = (res && res.data) ? res.data : res
+      const books = (data && data.books) ? data.books : []
+      // 标记结果类型
+      books.forEach(b => { b.resultType = 'sonovel' })
+      this.allSearchResults = books
+      this.total = books.length
+      this.searchPage = 1
+    },
+
+    /** 番茄搜索 + 无结果自动回退 so-novel */
+    async doFanqieSearchWithFallback(kw) {
+      this.searchEngine = 'ranking'
+      const res = await searchBooks({ keyword: kw, platform: 'fanqie', limit: 200 })
+      const data = (res && res.data) ? res.data : res
+      const books = (data && data.books) ? data.books : []
+
+      if (books.length > 0) {
+        this.allSearchResults = books
+        this.total = books.length
+        this.searchPage = 1
+      } else {
+        // 番茄无结果 → 自动回退全平台搜索
+        this.$message.info('番茄搜索无结果，已自动切换到全平台搜索')
+        await this.doSonovelSearch(kw)
+      }
+    },
+
+    /** 榜单快照搜索 */
+    async doRankingSearch(kw) {
+      this.searchEngine = 'ranking'
+      const res = await searchBooks({
+        keyword: kw,
+        platform: this.searchPlatform,
+        limit: 200
+      })
+      const data = (res && res.data) ? res.data : res
+      const books = (data && data.books) ? data.books : []
+      this.allSearchResults = books
+      this.total = books.length
+      this.searchPage = 1
+    },
+
     /** 清空搜索 */
     clearSearch() {
       this.searchKeyword = ''
-      this.tableData = []
+      this.searchEngine = ''
+      this.allSearchResults = []
       this.total = 0
+      this.searchPage = 1
     },
 
     /** 平台值 → 中文名 */
@@ -1077,11 +1295,12 @@ export default {
 
 <style lang="scss" scoped>
 .cell-text {
-  display: inline-block;
-  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
+  line-height: 1.5;
+  word-break: break-all;
 }
 </style>

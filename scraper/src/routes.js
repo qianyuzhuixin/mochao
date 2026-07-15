@@ -22,6 +22,11 @@ const {
   generateHtmlContent,
   generatePdfContent,
 } = require('./download');
+const {
+  RULES: SONOVEL_RULES,
+  searchAllSources,
+  downloadBook: downloadSonovelBook,
+} = require('./sonovel');
 
 const app = express();
 app.use(express.json());
@@ -361,6 +366,175 @@ app.post('/download-file', async (req, res) => {
     console.log(`[download-file] ✓ ${bookData.bookName}.${ext} (${format === 'pdf' ? content.length + ' bytes' : content.length + ' chars'})`);
   } catch (err) {
     console.error(`[download-file] 失败:`, err.message);
+    res.status(500).json({
+      error: '下载失败',
+      detail: err.message,
+    });
+  }
+});
+
+// ===========================
+// so-novel 全平台搜索 + 下载
+// ===========================
+
+/** 列出可用书源 */
+app.get('/sonovel/sources', (_req, res) => {
+  res.json({
+    success: true,
+    sources: SONOVEL_RULES.map(r => ({
+      name: r.name,
+      url: r.url,
+      searchable: !!r.search,
+    })),
+  });
+});
+
+/** 全平台搜索 */
+app.post('/sonovel/search', async (req, res) => {
+  const { keyword } = req.body;
+
+  if (!keyword) {
+    return res.status(400).json({ error: '缺少参数: keyword' });
+  }
+
+  console.log(`[sonovel-search] 收到搜索请求: "${keyword}"`);
+
+  try {
+    const results = await searchAllSources(keyword, 30000);
+
+    res.json({
+      success: true,
+      keyword,
+      count: results.length,
+      books: results,
+      searchedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(`[sonovel-search] 搜索失败:`, err.message);
+    res.json({
+      success: false,
+      error: '全平台搜索失败',
+      detail: err.message,
+      keyword,
+      count: 0,
+      books: [],
+      searchedAt: new Date().toISOString(),
+    });
+  }
+});
+
+/** so-novel 下载（从指定书源下载整本） */
+app.post('/sonovel/download', async (req, res) => {
+  const { bookUrl, sourceName, maxChapters } = req.body;
+
+  if (!bookUrl || !sourceName) {
+    return res.status(400).json({ error: '缺少参数: bookUrl, sourceName' });
+  }
+
+  console.log(`[sonovel-download] ${sourceName}: ${bookUrl} (maxChapters=${maxChapters || 0})`);
+
+  try {
+    const result = await downloadSonovelBook(bookUrl, sourceName, maxChapters || 0);
+
+    res.json({
+      success: true,
+      bookName: result.bookName,
+      author: result.author,
+      intro: result.intro,
+      sourceName: result.sourceName,
+      totalChapters: result.totalChapters,
+      downloadedChapters: result.downloadedChapters,
+      chapters: result.chapters,
+      downloadedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(`[sonovel-download] 下载失败:`, err.message);
+    res.json({
+      success: false,
+      error: '下载失败',
+      detail: err.message,
+      bookUrl,
+      sourceName,
+      downloadedAt: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * so-novel 下载文件（TXT / HTML / PDF）
+ * 从指定书源下载章节，直接生成文件返回，不存入数据库
+ * Body: { bookUrl, sourceName, format: "txt"|"html"|"pdf", maxChapters? }
+ */
+app.post('/sonovel/download-file', async (req, res) => {
+  const { bookUrl, sourceName, format, maxChapters } = req.body;
+
+  if (!bookUrl || !sourceName || !format) {
+    return res.status(400).json({ error: '缺少参数: bookUrl, sourceName, format' });
+  }
+
+  if (!['txt', 'html', 'pdf'].includes(format)) {
+    return res.status(400).json({
+      error: `不支持的格式: ${format}`,
+      supported: ['txt', 'html', 'pdf'],
+    });
+  }
+
+  console.log(`[sonovel-download-file] ${sourceName}: ${bookUrl} → ${format} (maxChapters=${maxChapters || 0})`);
+
+  try {
+    // 1. 下载章节内容
+    const result = await downloadSonovelBook(bookUrl, sourceName, maxChapters || 0);
+
+    // 2. 映射到 generateXxxContent 所需的 bookData 结构
+    const bookData = {
+      bookName: result.bookName,
+      author: result.author || '未知',
+      category: '网络小说',
+      abstract: result.intro || '',
+      totalWords: result.chapters.reduce((sum, ch) => sum + (ch.content ? ch.content.length : 0), 0),
+      downloadedChapters: result.downloadedChapters,
+      chapters: result.chapters.map(ch => ({
+        title: ch.title,
+        content: ch.content,
+      })),
+    };
+
+    // 3. 按格式生成文件
+    let content, contentType, ext;
+    switch (format) {
+      case 'txt':
+        content = generateTxtContent(bookData);
+        // so-novel 来源标注替换
+        content = content.replace('来源：番茄小说 fanqienovel.com', `来源：${sourceName}`);
+        contentType = 'text/plain; charset=utf-8';
+        ext = 'txt';
+        break;
+      case 'html':
+        content = generateHtmlContent(bookData);
+        content = content.replace('番茄小说 fanqienovel.com', sourceName);
+        contentType = 'text/html; charset=utf-8';
+        ext = 'html';
+        break;
+      case 'pdf':
+        content = await generatePdfContent(bookData);
+        contentType = 'application/pdf';
+        ext = 'pdf';
+        break;
+    }
+
+    // 4. 构建文件名
+    const rawName = result.bookName.replace(/[\\/:*?"<>|]/g, '_');
+    const filename = encodeURIComponent(`${rawName} - ${result.author || '未知'}`) + '.' + ext;
+
+    // 5. 返回文件
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
+    res.setHeader('Content-Length', Buffer.isBuffer(content) ? content.length : Buffer.byteLength(content, 'utf8'));
+    res.send(content);
+
+    console.log(`[sonovel-download-file] ✓ ${result.bookName}.${ext} (${format === 'pdf' ? content.length + ' bytes' : content.length + ' chars'})`);
+  } catch (err) {
+    console.error(`[sonovel-download-file] 失败:`, err.message);
     res.status(500).json({
       error: '下载失败',
       detail: err.message,

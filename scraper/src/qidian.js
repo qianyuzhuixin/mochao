@@ -47,7 +47,7 @@ function normalizeQidianBook(record, idx) {
     category: [record.cat, record.subCat].filter(Boolean).join('·'),
     wordCount: parseInt(record.wordCnt) || 0,
     hotValue: parseInt(record.cnt) || parseInt(record.rankCnt) || 0,
-    intro: (record.desc || '').slice(0, 200),
+    intro: record.desc || '',
     coverUrl: '',
     bookUrl: bid ? `https://www.qidian.com/book/${bid}/` : '',
     rankNo: record.rankNum || idx + 1,

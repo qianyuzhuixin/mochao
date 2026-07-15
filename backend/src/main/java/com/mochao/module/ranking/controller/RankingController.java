@@ -347,4 +347,176 @@ public class RankingController {
 
         return book;
     }
+
+    // ===========================
+    // so-novel 全平台搜索 + 下载
+    // ===========================
+
+    /**
+     * 全平台搜索小说（so-novel 规则引擎，11 个书源并发搜索）
+     * @param body { keyword }
+     */
+    @PostMapping("/sonovel/search")
+    public Result<Map<String, Object>> sonovelSearch(@RequestBody Map<String, Object> body) {
+        String keyword = (String) body.get("keyword");
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return Result.error(400, "缺少参数: keyword");
+        }
+
+        log.info("全平台搜索: keyword={}", keyword);
+
+        Map<String, Object> result = scraperClient.sonovelSearch(keyword.trim());
+        return Result.success(result);
+    }
+
+    /**
+     * so-novel 下载整本小说到素材库
+     * @param body { bookUrl, sourceName, target: "personal"|"library", maxChapters? }
+     */
+    @SuppressWarnings("unchecked")
+    @PostMapping("/sonovel/download-book")
+    public Result<Map<String, Object>> sonovelDownloadBook(@RequestBody Map<String, Object> body) {
+        String bookUrl = (String) body.get("bookUrl");
+        String sourceName = (String) body.get("sourceName");
+        String target = (String) body.getOrDefault("target", "personal");
+        int maxChapters = body.containsKey("maxChapters") && body.get("maxChapters") != null
+                ? ((Number) body.get("maxChapters")).intValue() : 0;
+
+        if (bookUrl == null || sourceName == null) {
+            return Result.error(400, "缺少参数: bookUrl, sourceName");
+        }
+
+        if ("library".equals(target) && !SecurityUtils.isAdmin()) {
+            return Result.error(403, "无权限：仅管理员可下载到内置书库");
+        }
+
+        log.info("so-novel下载: source={}, url={}, target={}, maxChapters={}", sourceName, bookUrl, target, maxChapters);
+
+        // 1. 调用 scraper 下载
+        Map<String, Object> downloadResult = scraperClient.sonovelDownload(bookUrl, sourceName, maxChapters);
+        if (!Boolean.TRUE.equals(downloadResult.get("success"))) {
+            String error = (String) downloadResult.getOrDefault("error", "下载失败");
+            String detail = (String) downloadResult.get("detail");
+            return Result.error(500, detail != null ? error + ": " + detail : error);
+        }
+
+        // 2. 构造 BookCreateDTO
+        String bookName = (String) downloadResult.get("bookName");
+        String author = (String) downloadResult.get("author");
+        String intro = (String) downloadResult.get("intro");
+        String fullText = new StringBuilder().toString(); // sonovel 不返回 fullText，从章节拼接
+
+        BookCreateDTO dto = new BookCreateDTO();
+        dto.setTitle(bookName);
+        dto.setBookName(bookName);
+        dto.setAuthor(author != null ? author : "");
+        dto.setCategory("网络小说");
+        dto.setContent(intro != null ? intro : "");
+        dto.setDifficulty("medium");
+
+        // 构造章节列表
+        List<Map<String, Object>> chapterList = (List<Map<String, Object>>) downloadResult.get("chapters");
+        if (chapterList != null && !chapterList.isEmpty()) {
+            List<ChapterItem> chapters = new ArrayList<>();
+            StringBuilder fullTextBuilder = new StringBuilder();
+            for (int i = 0; i < chapterList.size(); i++) {
+                Map<String, Object> ch = chapterList.get(i);
+                ChapterItem item = new ChapterItem();
+                item.setIndex(i);
+                item.setTitle((String) ch.get("title"));
+                String content = (String) ch.get("content");
+                item.setContent(content);
+                int wc = content != null ? content.length() : 0;
+                item.setWordCount(wc);
+                chapters.add(item);
+                if (content != null && !"[下载失败]".equals(content)) {
+                    fullTextBuilder.append(content).append("\n\n");
+                }
+            }
+            dto.setChapters(chapters);
+            dto.setContent(fullTextBuilder.toString());
+        }
+
+        // 3. 保存到数据库
+        Long userId = SecurityUtils.getCurrentUserId();
+        Book savedBook;
+        if ("library".equals(target)) {
+            savedBook = createBuiltinBook(dto, userId);
+        } else {
+            savedBook = bookService.createBook(dto, userId);
+        }
+
+        // 4. 返回结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("bookId", savedBook.getId());
+        result.put("bookName", savedBook.getBookName());
+        result.put("author", savedBook.getAuthor());
+        result.put("totalChapters", downloadResult.get("totalChapters"));
+        result.put("downloadedChapters", downloadResult.get("downloadedChapters"));
+        result.put("target", target);
+        result.put("sourceName", sourceName);
+        String message = String.format("《%s》已从%s下载到%s（%s章）",
+                bookName,
+                sourceName,
+                "library".equals(target) ? "内置书库" : "个人素材",
+                downloadResult.get("downloadedChapters"));
+        result.put("message", message);
+
+        log.info("so-novel下载完成: {} → {} (bookId={})", bookName, target, savedBook.getId());
+        return Result.success(result);
+    }
+
+    /**
+     * so-novel 下载文件（TXT / HTML / PDF）
+     * 直接返回可下载的文件流，不存入数据库
+     *
+     * @param body { bookUrl, sourceName, format: "txt"|"html"|"pdf", maxChapters? }
+     */
+    @PostMapping("/sonovel/download-file")
+    public ResponseEntity<byte[]> sonovelDownloadFile(@RequestBody Map<String, Object> body) {
+        String bookUrl = (String) body.get("bookUrl");
+        String sourceName = (String) body.get("sourceName");
+        String format = (String) body.getOrDefault("format", "txt");
+        int maxChapters = body.containsKey("maxChapters") && body.get("maxChapters") != null
+                ? ((Number) body.get("maxChapters")).intValue() : 0;
+
+        if (bookUrl == null || sourceName == null) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        if (!"txt".equals(format) && !"html".equals(format) && !"pdf".equals(format)) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        log.info("so-novel文件下载: source={}, url={}, format={}, maxChapters={}", sourceName, bookUrl, format, maxChapters);
+
+        try {
+            ResponseEntity<byte[]> scraperResp = scraperClient.sonovelDownloadFile(bookUrl, sourceName, format, maxChapters);
+
+            byte[] fileBytes = scraperResp.getBody();
+            if (fileBytes == null || fileBytes.length == 0) {
+                return ResponseEntity.internalServerError().body(null);
+            }
+
+            HttpHeaders scraperHeaders = scraperResp.getHeaders();
+            MediaType contentType = scraperHeaders.getContentType();
+            String contentDisposition = scraperHeaders.getFirst(HttpHeaders.CONTENT_DISPOSITION);
+
+            HttpHeaders respHeaders = new HttpHeaders();
+            if (contentType != null) {
+                respHeaders.setContentType(contentType);
+            }
+            if (contentDisposition != null) {
+                respHeaders.set(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+            }
+            respHeaders.setContentLength(fileBytes.length);
+
+            log.info("so-novel文件下载完成: {} bytes, type={}", fileBytes.length, contentType);
+
+            return ResponseEntity.ok().headers(respHeaders).body(fileBytes);
+        } catch (Exception e) {
+            log.error("so-novel文件下载失败: source={}, url={}, format={}, error={}", sourceName, bookUrl, format, e.getMessage());
+            return ResponseEntity.internalServerError().body(null);
+        }
+    }
 }
