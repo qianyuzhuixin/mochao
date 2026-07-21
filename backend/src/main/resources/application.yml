@@ -16,16 +16,6 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
-# ==================== MinIO 对象存储 ====================
-minio:
-  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
-  access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
-  bucket: ${MINIO_BUCKET:mochao}
-  # 外部访问端点（如果 MinIO 在 Docker 内网，前端无法直接访问，需要通过后端代理）
-  # 留空则使用 endpoint 作为外部访问地址
-  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
-
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   global-config:

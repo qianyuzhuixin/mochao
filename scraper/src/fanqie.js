@@ -7,35 +7,35 @@ const { fetchText, PC_HEADERS, extractInitialState, batchRun, logTop3 } = requir
 // 分类 id 列表（来自 __INITIAL_STATE__.rank.rankCategoryTypeList）
 const FANQIE_CATEGORIES = {
   male: {
-    1141: '西方奇幻',  1140: '东方仙侠',    8: '科幻末世',
-    261:  '都市日常',  124:  '都市修真',   1014: '都市高武',
-    273:  '历史古代',   27:  '战神赘婿',    263: '都市种田',
-    258:  '传统玄幻',  272:  '历史脑洞',    539: '悬疑脑洞',
-    262:  '都市脑洞',  257:  '玄幻脑洞',    751: '悬疑灵异',
-    504:  '抗战谍战',  746:  '游戏体育',    718: '动漫衍生',
+    1141: '西方奇幻', 1140: '东方仙侠', 8: '科幻末世',
+    261: '都市日常', 124: '都市修真', 1014: '都市高武',
+    273: '历史古代', 27: '战神赘婿', 263: '都市种田',
+    258: '传统玄幻', 272: '历史脑洞', 539: '悬疑脑洞',
+    262: '都市脑洞', 257: '玄幻脑洞', 751: '悬疑灵异',
+    504: '抗战谍战', 746: '游戏体育', 718: '动漫衍生',
     1016: '男频衍生',
   },
   female: {
-    1139: '古风世情',    8: '科幻末世',    746: '游戏体育',
-    1015: '女频衍生',  248: '玄幻言情',     23: '种田',
-      79: '年代',      267: '现言脑洞',    246: '宫斗宅斗',
-     539: '悬疑脑洞',  253: '古言脑洞',     24: '快穿',
-     749: '青春甜宠',  745: '星光璀璨',    747: '女频悬疑',
-     750: '职场婚恋',  748: '豪门总裁',   1017: '民国言情',
+    1139: '古风世情', 8: '科幻末世', 746: '游戏体育',
+    1015: '女频衍生', 248: '玄幻言情', 23: '种田',
+    79: '年代', 267: '现言脑洞', 246: '宫斗宅斗',
+    539: '悬疑脑洞', 253: '古言脑洞', 24: '快穿',
+    749: '青春甜宠', 745: '星光璀璨', 747: '女频悬疑',
+    750: '职场婚恋', 748: '豪门总裁', 1017: '民国言情',
   },
 };
 
 /** 综合榜单（全站不分品类） */
 const FANQIE_OVERALL_RANK_URLS = {
   hot_search: 'https://fanqienovel.com/rank/hot_search',
-  read_rank:  'https://fanqienovel.com/rank/read_rank',
-  new_book:   'https://fanqienovel.com/rank/new_book',
+  read_rank: 'https://fanqienovel.com/rank/read_rank',
+  new_book: 'https://fanqienovel.com/rank/new_book',
 };
 
 const FANQIE_OVERALL_LABELS = {
   hot_search: '热搜榜',
-  read_rank:  '阅读榜',
-  new_book:   '新书榜',
+  read_rank: '阅读榜',
+  new_book: '新书榜',
 };
 
 /**
@@ -130,7 +130,7 @@ async function fetchFanqieDetail(bookId) {
         category = names[0] || '';
         tags = names.slice(1).join('·');
       }
-    } catch {}
+    } catch { }
 
     const bookName = page.bookName || '';
 
@@ -345,17 +345,17 @@ async function searchFanqieBooks(keyword, page = 0, pageSize = 10) {
   console.log(`[search] 结果: ${retData.length}条, hasMore=${hasMore}`);
 
   const books = retData.map(item => ({
-    bookId:    String(item.book_id || ''),
-    bookName:  item.title || '',
-    author:    item.author || '',
-    category:  item.category || '',
+    bookId: String(item.book_id || ''),
+    bookName: item.title || '',
+    author: item.author || '',
+    category: item.category || '',
     wordCount: 0,                               // 此接口不返回字数
     readCount: 0,                               // 此接口不返回阅读量
-    coverUrl:  item.thumb_url || item.audio_thumb_uri || '',
-    status:    item.creation_status === '1' ? '连载中' : '',
-    abstract:  (item.abstract || '').slice(0, 300),
-    bookUrl:   item.book_id ? `https://fanqienovel.com/page/${item.book_id}` : '',
-    score:     item.score || '',
+    coverUrl: item.thumb_url || item.audio_thumb_uri || '',
+    status: item.creation_status === '1' ? '连载中' : '',
+    abstract: item.abstract || '',
+    bookUrl: item.book_id ? `https://fanqienovel.com/page/${item.book_id}` : '',
+    score: item.score || '',
   }));
 
   return { books, total: retData.length, hasMore };

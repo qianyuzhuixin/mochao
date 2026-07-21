@@ -30,6 +30,31 @@ export function downloadBook(data) {
   return request({ url: '/ranking/download-book', method: 'post', data, timeout: 360000 })
 }
 
+/** so-novel 全平台搜索（11 书源并发） */
+export function sonovelSearch(data) {
+  return request({ url: '/ranking/sonovel/search', method: 'post', data, timeout: 60000 })
+}
+
+/** so-novel 下载整本小说 */
+export function sonovelDownloadBook(data) {
+  return request({ url: '/ranking/sonovel/download-book', method: 'post', data, timeout: 360000 })
+}
+
+/**
+ * so-novel 下载文件（TXT / HTML / PDF），直接返回文件 Blob，不存入数据库
+ * @param {Object} data - { bookUrl, sourceName, format, maxChapters? }
+ * @returns {Promise<Blob>} 文件 Blob
+ */
+export function sonovelDownloadFile(data) {
+  return request({
+    url: '/ranking/sonovel/download-file',
+    method: 'post',
+    data,
+    responseType: 'blob',
+    timeout: 360000
+  })
+}
+
 /**
  * 下载小说文件（TXT / HTML / PDF）
  * @param {string} bookId - 书籍 ID

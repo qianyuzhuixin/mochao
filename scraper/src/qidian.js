@@ -6,36 +6,36 @@ const { fetchText, MOBILE_HEADERS, logTop3 } = require('./utils');
 
 const QIDIAN_RANK_URLS = {
   month_ticket: 'https://m.qidian.com/rank/yuepiao/',
-  recommend:    'https://m.qidian.com/rank/rec/',
-  collect:      'https://m.qidian.com/rank/newfans/',
-  hotsales:     'https://m.qidian.com/rank/hotsales/',
-  readindex:    'https://m.qidian.com/rank/readindex/',
+  recommend: 'https://m.qidian.com/rank/rec/',
+  collect: 'https://m.qidian.com/rank/newfans/',
+  hotsales: 'https://m.qidian.com/rank/hotsales/',
+  readindex: 'https://m.qidian.com/rank/readindex/',
   // newsign 已被起点移除（2026-07），不再有独立页面
-  signnewbook:  'https://m.qidian.com/rank/signnewbook/',
-  newauthor:    'https://m.qidian.com/rank/newauthor/',
-  pubnewbook:   'https://m.qidian.com/rank/newbook/',
-  sanjiang:     'https://m.qidian.com/sanjiang/',
+  signnewbook: 'https://m.qidian.com/rank/signnewbook/',
+  newauthor: 'https://m.qidian.com/rank/newauthor/',
+  pubnewbook: 'https://m.qidian.com/rank/newbook/',
+  sanjiang: 'https://m.qidian.com/sanjiang/',
 };
 
 const QIDIAN_RANK_LABELS = {
   month_ticket: '月票榜',
-  recommend:    '推荐票榜',
-  collect:      '收藏榜',
-  hotsales:     '畅销榜',
-  readindex:    '阅读指数榜',
-  newsign:      '新人签约新书榜（已下架）',
-  signnewbook:  '签约作者新书榜',
-  newauthor:    '新人作者新书榜',
-  pubnewbook:   '公众作者新书榜',
-  sanjiang:     '三江推荐',
+  recommend: '推荐票榜',
+  collect: '收藏榜',
+  hotsales: '畅销榜',
+  readindex: '阅读指数榜',
+  newsign: '新人签约新书榜（已下架）',
+  signnewbook: '签约作者新书榜',
+  newauthor: '新人作者新书榜',
+  pubnewbook: '公众作者新书榜',
+  sanjiang: '三江推荐',
 };
 
 /** Hub 聚合页 — 部分榜单独立页 404 时的回退数据源 */
 const HUB_PAGE_URL = 'https://m.qidian.com/rank/';
 const HUB_RANK_KEY_MAP = {
   signnewbook: 'signRank',   // 签约作者新书榜
-  newauthor:   'newbRank',   // 新人作者新书榜
-  pubnewbook:  'newpRank',   // 公众作者新书榜
+  newauthor: 'newbRank',   // 新人作者新书榜
+  pubnewbook: 'newpRank',   // 公众作者新书榜
 };
 
 /** 已被起点下架的榜单类型 */

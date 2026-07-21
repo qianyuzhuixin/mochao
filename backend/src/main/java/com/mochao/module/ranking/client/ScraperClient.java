@@ -168,4 +168,105 @@ public class ScraperClient {
                 byte[].class
         );
     }
+
+    // ===========================
+    // so-novel 全平台搜索 + 下载
+    // ===========================
+
+    /**
+     * 全平台搜索小说（so-novel 规则引擎，11 个书源并发搜索）
+     * @param keyword 搜索关键词
+     * @return 搜索结果 Map（含 success, count, books）
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> sonovelSearch(String keyword) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("keyword", keyword);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        log.info("全平台搜索: keyword={}", keyword);
+
+        try {
+            String response = restTemplate.postForObject(
+                    scraperBaseUrl + "/sonovel/search",
+                    new HttpEntity<>(body, headers),
+                    String.class
+            );
+            return objectMapper.readValue(response, Map.class);
+        } catch (Exception e) {
+            log.error("全平台搜索失败: keyword={} - {}", keyword, e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", "全平台搜索服务调用失败");
+            errorResult.put("detail", e.getMessage());
+            errorResult.put("books", new java.util.ArrayList<>());
+            errorResult.put("count", 0);
+            return errorResult;
+        }
+    }
+
+    /**
+     * so-novel 下载整本小说（从指定书源下载）
+     * @param bookUrl 书籍详情页 URL
+     * @param sourceName 书源名称
+     * @param maxChapters 最多下载章节数 (0 = 全部)
+     * @return 下载结果 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> sonovelDownload(String bookUrl, String sourceName, int maxChapters) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("bookUrl", bookUrl);
+        body.put("sourceName", sourceName);
+        body.put("maxChapters", maxChapters);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        log.info("so-novel下载: source={}, url={}, maxChapters={}", sourceName, bookUrl, maxChapters);
+
+        try {
+            String response = downloadRestTemplate.postForObject(
+                    scraperBaseUrl + "/sonovel/download",
+                    new HttpEntity<>(body, headers),
+                    String.class
+            );
+            return objectMapper.readValue(response, Map.class);
+        } catch (Exception e) {
+            log.error("so-novel下载失败: source={}, url={} - {}", sourceName, bookUrl, e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", "下载服务调用失败");
+            errorResult.put("detail", e.getMessage());
+            return errorResult;
+        }
+    }
+
+    /**
+     * so-novel 下载文件（txt/html/pdf），直接返回文件字节流，不存入数据库
+     * @param bookUrl 书籍详情页 URL
+     * @param sourceName 书源名称
+     * @param format 输出格式 (txt|html|pdf)
+     * @param maxChapters 最多下载章节数 (0 = 全部)
+     * @return ResponseEntity 包含文件字节、Content-Type 和 Content-Disposition
+     */
+    public ResponseEntity<byte[]> sonovelDownloadFile(String bookUrl, String sourceName, String format, int maxChapters) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("bookUrl", bookUrl);
+        body.put("sourceName", sourceName);
+        body.put("format", format);
+        body.put("maxChapters", maxChapters);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        log.info("so-novel下载文件: source={}, url={}, format={}, maxChapters={}", sourceName, bookUrl, format, maxChapters);
+
+        return downloadRestTemplate.postForEntity(
+                scraperBaseUrl + "/sonovel/download-file",
+                new HttpEntity<>(body, headers),
+                byte[].class
+        );
+    }
 }
