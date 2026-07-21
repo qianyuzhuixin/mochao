@@ -44,6 +44,12 @@ const routes = [
     meta: { title: '抄书练习', requiresAuth: true }
   },
   {
+    path: '/summary-practice/:sessionId',
+    name: 'SummaryPractice',
+    component: () => import('@/views/practice/SummaryPractice.vue'),
+    meta: { title: '摘要写作练习', requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/dashboard/Dashboard.vue'),
@@ -94,6 +100,24 @@ const routes = [
         name: 'OutlineEditor',
         component: () => import('@/views/novels/OutlineEditor.vue'),
         meta: { title: '大纲编辑', requiresAuth: true }
+      },
+      {
+        path: 'volumes',
+        name: 'VolumeList',
+        component: () => import('@/views/novels/VolumeList.vue'),
+        meta: { title: '卷纲管理', requiresAuth: true }
+      },
+      {
+        path: 'volumes/:volId/acts',
+        name: 'ActListByVolume',
+        component: () => import('@/views/novels/ActList.vue'),
+        meta: { title: '幕纲管理', requiresAuth: true }
+      },
+      {
+        path: 'acts',
+        name: 'ActList',
+        component: () => import('@/views/novels/ActList.vue'),
+        meta: { title: '幕纲管理', requiresAuth: true }
       },
       {
         path: 'worldview',
@@ -171,6 +195,12 @@ const routes = [
         name: 'AiConfig',
         component: () => import('@/views/profile/AiConfig.vue'),
         meta: { title: 'AI 模型配置', requiresAuth: true }
+      },
+      {
+        path: 'prompt-templates',
+        name: 'PromptTemplates',
+        component: () => import('@/views/profile/PromptTemplates.vue'),
+        meta: { title: 'AI 提示词模板', requiresAuth: true }
       }
     ]
   },

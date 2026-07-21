@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="library-page page-container">
       <div class="library-header">
         <h1 class="page-title">书库</h1>
@@ -71,7 +71,7 @@
         </div>
       </div>
 
-      <empty-state v-if="!loading && bookList.length === 0" text="暂无素材" description="换个筛选条件试试" />
+      <EmptyState v-if="!loading && bookList.length === 0" text="暂无素材" description="换个筛选条件试试" />
 
       <!-- 分页 -->
       <div v-if="total > 0" class="pagination-wrapper">
@@ -181,7 +181,7 @@
         </div>
       </el-dialog>
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>

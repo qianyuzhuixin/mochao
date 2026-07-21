@@ -13,7 +13,7 @@ const PC_HEADERS = {
     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-  'Accept-Encoding': 'identity',
+  'Accept-Encoding': 'gzip, deflate',
 };
 
 /** GBK 请求头 — 用于晋江（需 gzip 支持） */
@@ -33,7 +33,7 @@ const MOBILE_HEADERS = {
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-  'Accept-Encoding': 'identity',
+  'Accept-Encoding': 'gzip, deflate',
 };
 
 /**

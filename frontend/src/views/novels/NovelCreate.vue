@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="novel-create-page page-container">
       <div class="back-btn">
         <el-button type="text" icon="el-icon-arrow-left" @click="$router.back()">返回</el-button>
@@ -38,7 +38,7 @@
         </el-form>
       </div>
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>

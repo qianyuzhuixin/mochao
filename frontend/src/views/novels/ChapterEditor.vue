@@ -22,7 +22,7 @@
     <div class="editor-body">
       <!-- 左侧侧边栏 -->
       <div class="editor-sidebar">
-        <chapter-sidebar
+        <ChapterSidebar
           :chapters="chapters"
           :current-id="chapterId"
           @select="handleSelectChapter"
@@ -87,7 +87,7 @@
     </div>
 
     <!-- AI工具条 -->
-    <ai-toolbar
+    <AiToolbar
       :visible="aiToolbarVisible"
       :position="aiToolbarPosition"
       @action="handleAiAction"
@@ -95,7 +95,7 @@
     />
 
     <!-- AI结果面板 -->
-    <ai-result-panel
+    <AiResultPanel
       :visible="aiPanelVisible"
       :result="aiResult"
       :loading="aiLoading"
@@ -201,7 +201,7 @@ export default {
         this.chapter = res
         this.content = res.content || ''
         this.lastSavedContent = this.content
-      } catch (e) {} finally {
+      } catch (e) { console.error(e) } finally {
         this.loading = false
       }
     },
@@ -245,7 +245,7 @@ export default {
         if (!silent) {
           this.$message.success('保存成功')
         }
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     },
     handleTextSelect() {
       const textarea = this.$refs.textareaRef
@@ -298,7 +298,7 @@ export default {
 
         this.aiResult = (res && res.content) || ''
         this.aiLogId = (res && res.logId) || null
-      } catch (e) {} finally {
+      } catch (e) { console.error(e) } finally {
         this.aiLoading = false
       }
     },
@@ -317,7 +317,7 @@ export default {
         this.aiPanelVisible = false
         this.$message.success('已采纳AI结果')
         this.handleSave(true)
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     },
     handleCancelAi() {
       this.aiPanelVisible = false

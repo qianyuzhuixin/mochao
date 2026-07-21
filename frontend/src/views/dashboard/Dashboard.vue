@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="dashboard-page page-container" v-loading="loading">
       <h1 class="page-title">数据看板</h1>
 
@@ -134,7 +134,7 @@
         </div>
       </div>
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>

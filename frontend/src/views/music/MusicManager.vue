@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="music-manager">
       <!-- ====== Hero Banner ====== -->
       <div class="hero-banner">
@@ -45,6 +45,15 @@
           </div>
         </div>
       </div>
+
+      <!-- ====== 主 Tab ====== -->
+      <div class="main-tabs">
+        <span class="main-tab active">
+          <i class="el-icon-service" /> 我的音乐库
+        </span>
+      </div>
+
+      <!-- ====== 我的音乐库 ====== -->
 
       <!-- ====== 上传区域 ====== -->
       <div class="upload-section">
@@ -220,8 +229,9 @@
           </div>
         </div>
       </div>
+
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>
@@ -574,6 +584,50 @@ export default {
 
   .clear-btn {
     margin-left: auto;
+  }
+}
+
+/* ====== Main Tabs ====== */
+.main-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 24px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+
+  .main-tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+
+    i {
+      margin-right: 4px;
+      font-size: 16px;
+      vertical-align: -1px;
+    }
+
+    &:first-child {
+      border-right: 1px solid var(--color-border);
+    }
+
+    &:hover {
+      color: var(--color-primary);
+      background: rgba(64, 158, 255, 0.03);
+    }
+
+    &.active {
+      color: var(--color-primary);
+      background: rgba(64, 158, 255, 0.06);
+      border-bottom-color: var(--color-primary);
+    }
   }
 }
 

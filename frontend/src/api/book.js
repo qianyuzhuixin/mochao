@@ -70,3 +70,11 @@ export function getChapters(bookId) {
     method: 'get'
   })
 }
+
+export function getBookContent(bookId, chapterIndex) {
+  return request({
+    url: `/books/${bookId}/content`,
+    method: 'get',
+    params: { chapterIndex }
+  })
+}

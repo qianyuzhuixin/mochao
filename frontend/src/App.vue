@@ -23,8 +23,8 @@
           </div>
           <div class="header-right">
             <!-- 音乐播放器：紧跟"背景音乐"菜单项后面 -->
-            <music-player v-if="showMusicPlayer" />
-            <theme-toggle />
+            <MusicPlayer v-if="showMusicPlayer" />
+            <ThemeToggle />
             <el-dropdown v-if="isLoggedIn" @command="handleCommand">
               <span class="user-info">
                 <el-avatar :size="32" icon="el-icon-user-solid" />

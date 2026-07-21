@@ -1,17 +1,17 @@
 <template>
-  <div class="item-list-page page-container" v-loading="loading">
+  <div class="item-list-page page-container page-container-narrow" v-loading="loading">
     <div class="page-header">
-      <el-button type="text" icon="el-icon-arrow-left" @click="$router.push(`/novels/${novelId}`)">
-        返回工作台
-      </el-button>
-      <h1 class="page-title">物品设定</h1>
+      <div>
+        <el-button type="text" icon="el-icon-back" class="back-btn" @click="$router.push(`/novels/${novelId}`)">返回</el-button>
+        <h1 class="page-title">物品设定</h1>
+      </div>
       <el-button type="primary" size="small" icon="el-icon-plus" @click="handleAdd">
         新建物品
       </el-button>
     </div>
 
     <div class="item-grid">
-      <item-card
+      <ItemCard
         v-for="item in list"
         :key="item.id"
         :data="item"
@@ -20,7 +20,7 @@
       />
     </div>
 
-    <empty-state v-if="!loading && list.length === 0" text="暂无物品" description="创建你的第一个物品" />
+    <EmptyState v-if="!loading && list.length === 0" text="暂无物品" description="创建你的第一个物品" />
 
     <el-dialog :title="editing ? '编辑物品' : '新建物品'" :visible.sync="dialogVisible" width="600px">
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
@@ -119,7 +119,7 @@ export default {
           }
           this.dialogVisible = false
           this.fetchData()
-        } catch (e) {} finally {
+        } catch (e) { console.error(e) } finally {
           this.submitting = false
         }
       })
@@ -132,7 +132,7 @@ export default {
           await deleteItem(this.novelId, item.id)
           this.$message.success('删除成功')
           this.fetchData()
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }).catch(() => {})
     }
   }
@@ -143,11 +143,14 @@ export default {
 .item-list-page {
   .page-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: #{$spacing-md};
     margin-bottom: #{$spacing-lg};
 
-    .page-title { margin: 0; flex: 1; }
+    .back-btn { margin-bottom: 4px; padding: 0; color: #4A6CF7; }
+
+    .page-title { margin: 0; }
   }
 
   .item-grid {

@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="profile-page page-container">
       <h1 class="page-title">个人中心</h1>
       <el-row :gutter="24">
@@ -27,6 +27,14 @@
                 <i class="el-icon-setting" />
                 <span>偏好设置</span>
               </el-menu-item>
+              <el-menu-item index="/profile/ai-config">
+                <i class="el-icon-cpu" />
+                <span>AI 模型配置</span>
+              </el-menu-item>
+              <el-menu-item index="/profile/prompt-templates">
+                <i class="el-icon-edit-outline" />
+                <span>AI 提示词模板</span>
+              </el-menu-item>
             </el-menu>
           </div>
         </el-col>
@@ -37,7 +45,7 @@
         </el-col>
       </el-row>
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>

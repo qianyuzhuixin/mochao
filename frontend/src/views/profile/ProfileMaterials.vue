@@ -125,7 +125,7 @@ export default {
           }
           this.dialogVisible = false
           this.fetchData()
-        } catch (e) {} finally {
+        } catch (e) { console.error(e) } finally {
           this.submitting = false
         }
       })
@@ -138,7 +138,7 @@ export default {
           await deleteBook(row.id)
           this.$message.success('删除成功')
           this.fetchData()
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }).catch(() => {})
     }
   }

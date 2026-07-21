@@ -1,22 +1,20 @@
 <template>
-  <div class="outline-editor page-container" v-loading="loading">
+  <div class="outline-editor page-container page-container-narrow" v-loading="loading">
     <div class="editor-header">
-      <el-button type="text" icon="el-icon-arrow-left" @click="$router.push(`/novels/${novelId}`)">
-        返回工作台
-      </el-button>
-      <h1 class="page-title">大纲编辑</h1>
+      <div>
+        <el-button type="text" icon="el-icon-back" class="back-btn" @click="$router.push(`/novels/${novelId}`)">返回</el-button>
+        <h1 class="page-title">大纲编辑</h1>
+      </div>
       <el-button type="primary" size="small" icon="el-icon-magic-stick" :loading="aiLoading" @click="handleGenerate">
         AI生成
       </el-button>
     </div>
 
     <div class="editor-card">
-      <el-input
+      <MarkdownInput
         v-model="outline"
-        type="textarea"
         :rows="20"
-        placeholder="在这里编写你的小说大纲..."
-        resize="vertical"
+        placeholder="在这里编写你的小说大纲，支持 Markdown..."
       />
     </div>
 
@@ -47,9 +45,11 @@
 <script>
 import { getOutline, saveOutline } from '@/api/novel'
 import { generateOutline } from '@/api/ai'
+import MarkdownInput from '@/components/common/MarkdownInput.vue'
 
 export default {
   name: 'OutlineEditor',
+  components: { MarkdownInput },
   data() {
     return {
       outline: '',
@@ -100,16 +100,17 @@ export default {
       this.aiLoading = true
       try {
         const res = await generateOutline({ novelId: this.novelId, prompt })
-        if (res) {
+        const content = res?.content || ''
+        if (content) {
           this.aiDialogVisible = false
           this.$confirm('AI已生成大纲，是否替换当前内容？', '提示', {
             confirmButtonText: '替换',
             cancelButtonText: '追加',
             type: 'info'
           }).then(() => {
-            this.outline = res
+            this.outline = content
           }).catch(() => {
-            this.outline += '\n\n' + res
+            this.outline += '\n\n' + content
           })
         }
       } catch (e) {
@@ -126,13 +127,15 @@ export default {
 .outline-editor {
   .editor-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: #{$spacing-md};
     margin-bottom: #{$spacing-lg};
 
+    .back-btn { margin-bottom: 4px; padding: 0; color: #4A6CF7; }
+
     .page-title {
       margin: 0;
-      flex: 1;
     }
   }
 

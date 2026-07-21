@@ -1,10 +1,10 @@
 <template>
-  <div class="chapter-outline-list-page page-container" v-loading="loading">
+  <div class="chapter-outline-list-page page-container page-container-narrow" v-loading="loading">
     <div class="page-header">
-      <el-button type="text" icon="el-icon-arrow-left" @click="$router.push(`/novels/${novelId}`)">
-        返回工作台
-      </el-button>
-      <h1 class="page-title">章纲管理</h1>
+      <div>
+        <el-button type="text" icon="el-icon-back" class="back-btn" @click="$router.push(`/novels/${novelId}`)">返回</el-button>
+        <h1 class="page-title">章纲管理</h1>
+      </div>
       <div>
         <el-button type="primary" size="small" icon="el-icon-magic-stick" :loading="aiLoading" @click="handleGenerate">
           AI生成
@@ -39,7 +39,7 @@
       </div>
     </draggable>
 
-    <empty-state v-if="!loading && list.length === 0" text="暂无章纲" description="创建你的第一个章纲" />
+    <EmptyState v-if="!loading && list.length === 0" text="暂无章纲" description="创建你的第一个章纲" />
 
     <el-dialog :title="editing ? '编辑章纲' : '新建章纲'" :visible.sync="dialogVisible" width="600px">
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
@@ -152,7 +152,7 @@ export default {
           }
           this.dialogVisible = false
           this.fetchData()
-        } catch (e) {} finally {
+        } catch (e) { console.error(e) } finally {
           this.submitting = false
         }
       })
@@ -165,7 +165,7 @@ export default {
           await deleteChapterOutline(this.novelId, item.id)
           this.$message.success('删除成功')
           this.fetchData()
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }).catch(() => {})
     },
     async handleDragEnd() {
@@ -173,7 +173,7 @@ export default {
       try {
         await reorderChapterOutlines(this.novelId, { order })
         this.$message.success('排序已更新')
-      } catch (e) {}
+      } catch (e) { console.error(e) }
     },
     async handleGenerate() {
       this.aiPrompt = ''
@@ -189,7 +189,7 @@ export default {
           this.$message.success('AI章纲已生成')
           this.fetchData()
         }
-      } catch (e) {} finally {
+      } catch (e) { console.error(e) } finally {
         this.aiLoading = false
       }
     }
@@ -201,11 +201,14 @@ export default {
 .chapter-outline-list-page {
   .page-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: #{$spacing-md};
     margin-bottom: #{$spacing-md};
 
-    .page-title { margin: 0; flex: 1; }
+    .back-btn { margin-bottom: 4px; padding: 0; color: #4A6CF7; }
+
+    .page-title { margin: 0; }
   }
 
   .drag-hint {

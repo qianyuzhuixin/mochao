@@ -69,7 +69,7 @@ async function scrapeQimao(rankType) {
 
     // 简介
     const introM = blk.match(/class="s-book-intro"[^>]*>([^<]*)</);
-    const intro = introM ? introM[1].trim().slice(0, 200) : '';
+    const intro = introM ? introM[1].trim() : '';
 
     // 热度值
     const heatM = blk.match(/class="rank-num"[^>]*>([^<]*)</);

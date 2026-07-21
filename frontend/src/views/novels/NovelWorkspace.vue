@@ -19,7 +19,7 @@
       <p v-if="novel.summary || novel.synopsis" class="novel-synopsis">{{ novel.summary || novel.synopsis }}</p>
 
       <!-- 进度概览 -->
-      <progress-overview :data="progressData" class="mb-lg" />
+      <ProgressOverview :data="progressData" class="mb-lg" />
 
       <!-- 功能入口 -->
       <h3 class="section-title">创作工作台</h3>
@@ -31,15 +31,29 @@
             <span class="entry-desc">故事大纲规划</span>
           </div>
         </div>
+        <div class="feature-entry" @click="$router.push(`/novels/${novelId}/volumes`)">
+          <i class="el-icon-notebook-1 icon" style="color: #EB2F96" />
+          <div class="entry-info">
+            <span class="entry-title">卷纲</span>
+            <span class="entry-desc">分卷大纲规划</span>
+          </div>
+        </div>
+        <div class="feature-entry" @click="$router.push(`/novels/${novelId}/acts`)">
+          <i class="el-icon-collection-tag icon" style="color: #52C41A" />
+          <div class="entry-info">
+            <span class="entry-title">幕</span>
+            <span class="entry-desc">幕纲情节细化</span>
+          </div>
+        </div>
         <div class="feature-entry" @click="$router.push(`/novels/${novelId}/worldview`)">
-          <i class="el-icon-picture-outline icon" style="color: #52C41A" />
+          <i class="el-icon-picture-outline icon" style="color: #FAAD14" />
           <div class="entry-info">
             <span class="entry-title">世界观</span>
             <span class="entry-desc">设定世界规则</span>
           </div>
         </div>
         <div class="feature-entry" @click="$router.push(`/novels/${novelId}/characters`)">
-          <i class="el-icon-user icon" style="color: #FAAD14" />
+          <i class="el-icon-user icon" style="color: #FA8C16" />
           <div class="entry-info">
             <span class="entry-title">人物设定</span>
             <span class="entry-desc">管理角色信息</span>
@@ -83,7 +97,7 @@
           <i class="el-icon-arrow-right" />
         </div>
       </div>
-      <empty-state v-else text="暂无章节" description="去章纲管理中创建章节吧" />
+      <EmptyState v-else text="暂无章节" description="去章纲管理中创建章节吧" />
     </div>
   </div>
 </template>

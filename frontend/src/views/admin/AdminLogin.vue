@@ -50,7 +50,7 @@ export default {
           }
           this.$message.success('登录成功')
           this.$router.push('/admin/dashboard')
-        } catch (e) {} finally {
+        } catch (e) { console.error(e) } finally {
           this.loading = false
         }
       })

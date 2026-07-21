@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="book-detail-page page-container" v-loading="loading">
       <div class="back-btn">
         <el-button type="text" icon="el-icon-arrow-left" @click="$router.back()">
@@ -25,9 +25,9 @@
               <span class="label">作者：</span>
               <span>{{ book.author || '未知' }}</span>
             </div>
-            <div class="info-item">
+            <div class="info-item info-item-category">
               <span class="label">分类：</span>
-              <el-tag v-if="book.category" size="mini">{{ book.category }}</el-tag>
+              <el-tag v-if="book.category" size="mini" class="category-tag" :title="book.category">{{ book.category }}</el-tag>
               <span v-else>未分类</span>
             </div>
             <div class="info-item">
@@ -54,12 +54,42 @@
             <h2 class="content-title">正文预览</h2>
             <span class="content-hint">选中文本可收藏好词好句</span>
           </div>
+
+          <!-- 章节选择器 -->
+          <div v-if="chapters.length > 0" class="chapter-nav">
+            <div class="chapter-selector">
+              <el-select v-model="currentChapterIdx" size="small" placeholder="选择章节" @change="onChapterSelect">
+                <el-option
+                  v-for="(ch, idx) in chapters"
+                  :key="idx"
+                  :label="ch.title"
+                  :value="idx"
+                />
+              </el-select>
+            </div>
+            <div class="chapter-pager">
+              <el-button
+                size="small"
+                icon="el-icon-arrow-left"
+                :disabled="currentChapterIdx <= 0"
+                @click="prevChapter"
+              >上一章</el-button>
+              <span class="chapter-info">{{ currentChapterIdx + 1 }} / {{ chapters.length }}</span>
+              <el-button
+                size="small"
+                icon="el-icon-arrow-right"
+                :disabled="currentChapterIdx >= chapters.length - 1"
+                @click="nextChapter"
+              >下一章</el-button>
+            </div>
+          </div>
+
           <div
             ref="contentRef"
             class="content-body"
             @mouseup="handleTextSelect"
           >
-            {{ book.content }}
+            {{ activeChapterContent }}
           </div>
         </div>
       </div>
@@ -91,7 +121,7 @@
         <div class="chapter-select-hint">请选择练习方式或指定章节</div>
         <div class="chapter-select-list">
           <div
-            v-for="(ch, idx) in chapters"
+            v-for="(ch, idx) in practiceChapters"
             :key="idx"
             class="chapter-select-item"
             :class="{ active: selectedChapterIndex === idx }"
@@ -114,12 +144,58 @@
             :disabled="selectedChapterIndex === null"
             @click="handleChapterConfirm"
           >
-            开始练习本章
+            下一步：选择模式
+          </el-button>
+        </div>
+      </el-dialog>
+
+      <!-- 练习模式选择弹窗 -->
+      <el-dialog title="选择练习模式" :visible.sync="modeDialogVisible" width="520px">
+        <div class="mode-select-list">
+          <div
+            class="mode-select-item"
+            :class="{ active: selectedMode === 'copy' }"
+            @click="selectedMode = 'copy'"
+          >
+            <div class="mode-icon">📝</div>
+            <div class="mode-info">
+              <div class="mode-name">1:1 抄写练习</div>
+              <div class="mode-desc">逐字逐句对照原文抄写，实时检测正确率</div>
+            </div>
+            <div class="mode-check">
+              <i class="el-icon-check" />
+            </div>
+          </div>
+          <div
+            class="mode-select-item"
+            :class="{ active: selectedMode === 'summary' }"
+            @click="selectedMode = 'summary'"
+          >
+            <div class="mode-icon">✍️</div>
+            <div class="mode-info">
+              <div class="mode-name">摘要写作练习</div>
+              <div class="mode-desc">
+                阅读原文 → 写300字摘要 → 根据摘要创作 → 对比原文学习
+              </div>
+            </div>
+            <div class="mode-check">
+              <i class="el-icon-check" />
+            </div>
+          </div>
+        </div>
+        <div slot="footer">
+          <el-button @click="modeDialogVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :disabled="!selectedMode"
+            @click="handleModeConfirm"
+          >
+            开始练习
           </el-button>
         </div>
       </el-dialog>
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>
@@ -145,11 +221,25 @@ export default {
       },
       chapterDialogVisible: false,
       chapters: [],
-      selectedChapterIndex: null
+      selectedChapterIndex: null,
+      // 练习模式选择
+      modeDialogVisible: false,
+      selectedMode: null,
+      pendingChapterIndex: null,
+      // 章节分页
+      currentChapterIdx: 0,
+      practiceChapters: []
     }
   },
   computed: {
-    ...mapGetters('auth', ['isLoggedIn'])
+    ...mapGetters('auth', ['isLoggedIn']),
+    activeChapterContent() {
+      if (this.chapters.length === 0) {
+        return this.book ? this.book.content : ''
+      }
+      const ch = this.chapters[this.currentChapterIdx]
+      return ch ? ch.content : ''
+    }
   },
   created() {
     this.fetchBook()
@@ -159,11 +249,44 @@ export default {
       this.loading = true
       try {
         this.book = await getBookById(this.$route.params.id)
+        // 同时加载章节列表（含内容）
+        try {
+          const chapterList = await getChapters(this.book.id)
+          if (chapterList && chapterList.length > 0) {
+            this.chapters = chapterList
+          }
+        } catch (e) {
+          // 无章节数据，使用原始内容
+        }
       } catch (e) {
         // 错误已处理
       } finally {
         this.loading = false
       }
+    },
+    scrollContentToTop() {
+      this.$nextTick(() => {
+        const el = this.$refs.contentRef
+        if (el) {
+          el.scrollTop = 0
+        }
+      })
+    },
+    prevChapter() {
+      if (this.currentChapterIdx > 0) {
+        this.currentChapterIdx--
+        this.scrollContentToTop()
+      }
+    },
+    nextChapter() {
+      if (this.currentChapterIdx < this.chapters.length - 1) {
+        this.currentChapterIdx++
+        this.scrollContentToTop()
+      }
+    },
+    onChapterSelect(idx) {
+      this.currentChapterIdx = idx
+      this.scrollContentToTop()
     },
     async handleStartPractice() {
       if (!this.isLoggedIn) {
@@ -173,27 +296,33 @@ export default {
       }
       try {
         // 获取章节列表，有章节就弹窗让用户选择
-        const chapters = await getChapters(this.book.id)
-        if (chapters && chapters.length > 0) {
-          // 在列表前面插入"整本练习"选项
-          this.chapters = [
+        const rawChapters = await getChapters(this.book.id)
+        if (rawChapters && rawChapters.length > 0) {
+          // 在列表前面插入"整本练习"选项（不覆盖 this.chapters）
+          const list = [
             { index: -1, title: '整本练习（不分章节）', wordCount: this.book.wordCount || 0, preview: '从头到尾完整练习' },
-            ...chapters
+            ...rawChapters
           ]
           this.selectedChapterIndex = 0
           this.chapterDialogVisible = true
+          // 在 dialog 的 v-for 中引用
+          this.$set(this, 'practiceChapters', list)
           return
         }
-        // 无章节，直接开始
-        this.doStartPractice()
+        // 无章节，直接显示模式选择
+        this.pendingChapterIndex = null
+        this.selectedMode = null
+        this.modeDialogVisible = true
       } catch (e) {
-        // 解析失败或无章节，直接开始整本练习
-        this.doStartPractice()
+        // 解析失败或无章节，直接显示模式选择
+        this.pendingChapterIndex = null
+        this.selectedMode = null
+        this.modeDialogVisible = true
       }
     },
-    async doStartPractice(chapterIndex) {
+    async doStartPractice(chapterIndex, mode) {
       try {
-        const params = { bookId: this.book.id }
+        const params = { bookId: this.book.id, mode: mode || 'copy' }
         if (chapterIndex !== undefined && chapterIndex !== null) {
           params.chapterIndex = chapterIndex
         }
@@ -201,18 +330,33 @@ export default {
         const query = (chapterIndex !== undefined && chapterIndex !== null)
           ? `?bookId=${this.book.id}&chapterIndex=${chapterIndex}`
           : `?bookId=${this.book.id}`
-        this.$router.push(`/practice/${res.id || res.sessionId}${query}`)
+        const sessionId = res.id || res.sessionId
+        // 根据模式跳转不同页面
+        if (mode === 'summary') {
+          this.$router.push(`/summary-practice/${sessionId}${query}`)
+        } else {
+          this.$router.push(`/practice/${sessionId}${query}`)
+        }
       } catch (e) {
         // 错误已处理
       }
     },
     async handleChapterConfirm() {
       if (this.selectedChapterIndex === null) return
-      const ch = this.chapters[this.selectedChapterIndex]
+      const ch = this.practiceChapters[this.selectedChapterIndex]
       // -1 表示整本练习，否则传递章节的实际 index 字段
-      const chapterIndex = (ch && ch.index === -1) ? null : (ch ? ch.index : null)
+      this.pendingChapterIndex = (ch && ch.index === -1) ? null : (ch ? ch.index : null)
       this.chapterDialogVisible = false
-      await this.doStartPractice(chapterIndex)
+      // 显示模式选择
+      this.selectedMode = null
+      this.$nextTick(() => {
+        this.modeDialogVisible = true
+      })
+    },
+    async handleModeConfirm() {
+      if (!this.selectedMode) return
+      this.modeDialogVisible = false
+      await this.doStartPractice(this.pendingChapterIndex, this.selectedMode)
     },
     handleTextSelect() {
       const selection = window.getSelection()
@@ -289,16 +433,35 @@ export default {
     }
 
     .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: #{$spacing-md};
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: #{$spacing-md} #{$spacing-xl};
 
       .info-item {
+        display: inline-flex;
+        align-items: center;
         font-size: $font-size-base;
         color: var(--color-text);
+        min-width: 0;
 
         .label {
           color: var(--color-text-secondary);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        &.info-item-category {
+          flex: 1 1 auto;
+          min-width: 120px;
+          max-width: 100%;
+
+          .category-tag {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
         }
       }
     }
@@ -338,6 +501,46 @@ export default {
       color: var(--color-text);
       white-space: pre-wrap;
       user-select: text;
+      max-height: calc(100vh - 340px);
+      min-height: 300px;
+      overflow-y: auto;
+      padding: $spacing-lg;
+      background: var(--color-bg);
+      border-radius: $border-radius-base;
+      border: 1px solid var(--color-border);
+
+      &::selection {
+        background: rgba(74, 108, 247, 0.2);
+      }
+    }
+
+    .chapter-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: $spacing-md;
+      flex-wrap: wrap;
+
+      .chapter-selector {
+        ::v-deep .el-select .el-input__inner {
+          max-width: 260px;
+        }
+      }
+
+      .chapter-pager {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .chapter-info {
+          font-size: $font-size-sm;
+          color: var(--color-text-secondary);
+          white-space: nowrap;
+          min-width: 60px;
+          text-align: center;
+        }
+      }
     }
   }
 
@@ -414,6 +617,119 @@ export default {
       text-overflow: ellipsis;
       white-space: nowrap;
       padding-left: 48px;
+    }
+  }
+
+  // 练习模式选择
+  .mode-select-list {
+    display: flex;
+    flex-direction: column;
+    gap: #{$spacing-md};
+  }
+
+  .mode-select-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: #{$spacing-md};
+    padding: #{$spacing-lg};
+    border: 2px solid var(--color-border);
+    border-radius: $border-radius-md;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: transparent;
+      transition: background 0.2s ease;
+    }
+
+    &:hover {
+      border-color: var(--color-primary);
+      background-color: rgba(74, 108, 247, 0.04);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74, 108, 247, 0.08);
+    }
+
+    &.active {
+      border-color: var(--color-primary);
+      background-color: rgba(74, 108, 247, 0.12);
+      box-shadow: 0 6px 20px rgba(74, 108, 247, 0.18);
+
+      &::before {
+        background: var(--color-primary);
+      }
+
+      .mode-icon {
+        background: rgba(74, 108, 247, 0.16);
+      }
+
+      .mode-info .mode-name {
+        color: var(--color-primary);
+      }
+
+      .mode-check {
+        opacity: 1;
+        transform: scale(1);
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: #fff;
+      }
+    }
+
+    .mode-icon {
+      font-size: 32px;
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-bg);
+      border-radius: $border-radius-base;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+
+    .mode-info {
+      flex: 1;
+      min-width: 0;
+
+      .mode-name {
+        font-size: $font-size-lg;
+        font-weight: 600;
+        color: var(--color-text);
+        margin-bottom: 4px;
+      }
+
+      .mode-desc {
+        font-size: $font-size-sm;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+      }
+    }
+
+    .mode-check {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--color-text-placeholder);
+      border-radius: 50%;
+      color: transparent;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+
+      i {
+        font-size: 14px;
+        font-weight: 700;
+      }
     }
   }
 }

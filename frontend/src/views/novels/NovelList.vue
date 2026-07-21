@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="novel-list-page page-container">
       <div class="page-header">
         <h1 class="page-title">我的小说</h1>
@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <empty-state
+      <EmptyState
         v-if="!loading && list.length === 0"
         text="还没有创建小说"
         description="点击右上角按钮开始创作你的第一部小说"
@@ -47,9 +47,9 @@
         <template #action>
           <el-button type="primary" @click="$router.push('/novels/create')">创建小说</el-button>
         </template>
-      </empty-state>
+      </EmptyState>
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>

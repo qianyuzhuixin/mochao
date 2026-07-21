@@ -118,3 +118,41 @@ export function saveChapter(id, chId, data) {
 export function updateChapterStatus(id, chId, data) {
   return request({ url: `/novels/${id}/chapters/${chId}/status`, method: 'put', data })
 }
+
+// 卷纲
+export function getVolumes(id) {
+  return request({ url: `/novels/${id}/volumes`, method: 'get' })
+}
+
+export function createVolume(id, data) {
+  return request({ url: `/novels/${id}/volumes`, method: 'post', data })
+}
+
+export function updateVolume(volumeId, data) {
+  return request({ url: `/novels/volumes/${volumeId}`, method: 'put', data })
+}
+
+export function deleteVolume(volumeId) {
+  return request({ url: `/novels/volumes/${volumeId}`, method: 'delete' })
+}
+
+// 幕
+export function getActsByNovel(id) {
+  return request({ url: `/novels/${id}/acts`, method: 'get' })
+}
+
+export function getActsByVolume(volumeId) {
+  return request({ url: `/novels/volumes/${volumeId}/acts`, method: 'get' })
+}
+
+export function createAct(id, data) {
+  return request({ url: `/novels/${id}/acts`, method: 'post', data })
+}
+
+export function updateAct(actId, data) {
+  return request({ url: `/novels/acts/${actId}`, method: 'put', data })
+}
+
+export function deleteAct(actId) {
+  return request({ url: `/novels/acts/${actId}`, method: 'delete' })
+}

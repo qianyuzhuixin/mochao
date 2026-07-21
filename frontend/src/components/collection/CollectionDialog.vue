@@ -1,5 +1,5 @@
 <template>
-  <el-dialog :title="isEdit ? '编辑收藏' : '收藏好词好句'" :visible.sync="visible" width="500px" @close="handleClose">
+  <el-dialog :title="isEdit ? '编辑收藏' : '收藏好词好句'" :visible.sync="localVisible" width="500px" @close="handleClose">
     <el-form ref="form" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="类型" prop="type">
         <el-radio-group v-model="form.type">
@@ -11,7 +11,7 @@
         <el-input v-model="form.content" type="textarea" :rows="5" placeholder="请输入内容" />
       </el-form-item>
       <el-form-item label="标签">
-        <tag-selector v-model="form.tags" />
+        <TagSelector v-model="form.tags" />
       </el-form-item>
       <el-form-item label="来源">
         <el-input v-model="form.bookTitle" placeholder="选填，来源书名" />
@@ -50,6 +50,10 @@ export default {
     }
   },
   computed: {
+    localVisible: {
+      get() { return this.visible },
+      set(val) { this.$emit('update:visible', val) }
+    },
     isEdit() {
       return this.data && this.data.id
     }
@@ -58,10 +62,14 @@ export default {
     visible(val) {
       if (val) {
         if (this.data) {
+          // 兼容 API 返回的逗号分隔字符串 和 新建时的数组格式
+          const tags = Array.isArray(this.data.tags)
+            ? this.data.tags
+            : (this.data.tags || '').split(',').filter(Boolean)
           this.form = {
             type: this.data.type || 'sentence',
             content: this.data.content || '',
-            tags: this.data.tags || [],
+            tags: tags,
             bookTitle: this.data.bookTitle || ''
           }
         } else {

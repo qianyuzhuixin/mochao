@@ -1,5 +1,5 @@
 <template>
-  <default-layout>
+  <DefaultLayout>
     <div class="collections-page page-container">
       <div class="page-header">
         <h1 class="page-title">好词好句</h1>
@@ -16,7 +16,7 @@
       </div>
 
       <!-- 每日回顾 -->
-      <daily-review :list="reviewList" />
+      <DailyReview :list="reviewList" />
 
       <!-- 筛选栏 -->
       <div class="filter-bar">
@@ -54,7 +54,7 @@
 
       <!-- 卡片网格 -->
       <div v-loading="loading" class="collection-grid">
-        <collection-card
+        <CollectionCard
           v-for="item in list"
           :key="item.id"
           :data="item"
@@ -63,7 +63,7 @@
         />
       </div>
 
-      <empty-state v-if="!loading && list.length === 0" text="暂无收藏" description="去练习中收藏好词好句吧" />
+      <EmptyState v-if="!loading && list.length === 0" text="暂无收藏" description="去练习中收藏好词好句吧" />
 
       <!-- 分页 -->
       <div v-if="total > 0" class="pagination-wrapper">
@@ -78,13 +78,13 @@
       </div>
 
       <!-- 收藏弹窗 -->
-      <collection-dialog
+      <CollectionDialog
         :visible.sync="dialogVisible"
         :data="editData"
         @submit="handleSubmit"
       />
     </div>
-  </default-layout>
+  </DefaultLayout>
 </template>
 
 <script>

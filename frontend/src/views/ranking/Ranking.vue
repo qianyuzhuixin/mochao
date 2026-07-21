@@ -1077,11 +1077,11 @@ export default {
 
 <style lang="scss" scoped>
 .cell-text {
-  display: inline-block;
-  max-width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
+  word-break: break-all;
 }
 </style>

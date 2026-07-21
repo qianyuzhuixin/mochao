@@ -99,7 +99,7 @@ export default {
           await updateUserStatus(row.id, newStatus)
           this.$message.success(`${action}成功`)
           this.fetchData()
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }).catch(() => {})
     }
   }

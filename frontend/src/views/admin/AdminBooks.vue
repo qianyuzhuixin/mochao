@@ -20,6 +20,13 @@
       <el-table-column prop="author" label="作者" width="120" />
       <el-table-column prop="category" label="分类" width="100" />
       <el-table-column prop="wordCount" label="字数" width="80" />
+      <el-table-column prop="sourceType" label="来源" width="70">
+        <template #default="{ row }">
+          <el-tag :type="row.sourceType === 0 ? 'info' : ''" size="mini">
+            {{ row.sourceType === 0 ? '内置' : '自建' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="difficulty" label="难度" width="80">
         <template #default="{ row }">
           <el-tag :type="diffType(row.difficulty)" size="mini">{{ diffText(row.difficulty) }}</el-tag>
@@ -161,7 +168,7 @@ export default {
           }
           this.dialogVisible = false
           this.fetchData()
-        } catch (e) {} finally {
+        } catch (e) { console.error(e) } finally {
           this.submitting = false
         }
       })
@@ -174,7 +181,7 @@ export default {
           await deleteBook(row.id)
           this.$message.success('删除成功')
           this.fetchData()
-        } catch (e) {}
+        } catch (e) { console.error(e) }
       }).catch(() => {})
     },
     async handleImport() {

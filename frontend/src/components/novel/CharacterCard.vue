@@ -17,7 +17,7 @@
       </el-dropdown>
     </div>
     <div v-if="data.description" class="card-body">
-      <p class="char-desc">{{ data.description }}</p>
+      <div class="char-desc" v-html="renderedDescription" />
     </div>
     <div v-if="data.tags && data.tags.length" class="card-footer">
       <el-tag v-for="tag in data.tags.slice(0, 3)" :key="tag" size="mini" effect="plain">
@@ -28,12 +28,17 @@
 </template>
 
 <script>
+import { marked } from 'marked'
+
 export default {
   name: 'CharacterCard',
   props: {
     data: { type: Object, required: true }
   },
   computed: {
+    renderedDescription() {
+      return marked.parse(this.data.description || '', { breaks: true, gfm: true })
+    },
     avatarColor() {
       const colors = ['#4A6CF7', '#52C41A', '#FAAD14', '#FF4D4F', '#722ED1', '#13C2C2']
       let hash = 0
@@ -107,9 +112,38 @@ export default {
       color: var(--color-text-secondary);
       line-height: 1.6;
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 4;
       -webkit-box-orient: vertical;
       overflow: hidden;
+
+      ::v-deep p {
+        margin: 0 0 6px;
+      }
+
+      ::v-deep ul,
+      ::v-deep ol {
+        padding-left: 16px;
+        margin: 4px 0;
+      }
+
+      ::v-deep li {
+        margin-bottom: 2px;
+      }
+
+      ::v-deep strong {
+        color: var(--color-text);
+        font-weight: 600;
+      }
+
+      ::v-deep h1,
+      ::v-deep h2,
+      ::v-deep h3,
+      ::v-deep h4 {
+        font-size: $font-size-sm;
+        font-weight: 600;
+        margin: 6px 0 4px;
+        color: var(--color-text);
+      }
     }
   }
 

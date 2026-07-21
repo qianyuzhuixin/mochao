@@ -1,6 +1,6 @@
 <template>
   <div class="practice-page" v-loading="loading">
-    <default-layout>
+    <DefaultLayout>
       <div class="practice-container" :class="{ 'focus-mode': focusMode }">
         <!-- 返回按钮 -->
         <div v-if="!focusMode" class="practice-topbar">
@@ -23,7 +23,7 @@
         </div>
 
         <!-- 实时数据栏 -->
-        <realtime-stats
+        <RealtimeStats
           v-if="!focusMode"
           :duration="duration"
           :accuracy="accuracy"
@@ -32,7 +32,7 @@
 
         <!-- 抄写对照区 -->
         <div class="practice-main">
-          <text-comparator
+          <TextComparator
             v-if="originalText"
             ref="comparator"
             :original-text="originalText"
@@ -92,7 +92,7 @@
           width="480px"
           center
         >
-          <score-card
+          <ScoreCard
             v-if="scoreDialogVisible"
             :accuracy="finalAccuracy"
             :speed="finalSpeed"
@@ -125,7 +125,7 @@
           </div>
         </el-dialog>
       </div>
-    </default-layout>
+    </DefaultLayout>
   </div>
 </template>
 
@@ -134,7 +134,7 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import TextComparator from '@/components/practice/TextComparator.vue'
 import RealtimeStats from '@/components/practice/RealtimeStats.vue'
 import ScoreCard from '@/components/practice/ScoreCard.vue'
-import { startPractice, getActivePractice, updateProgress, completePractice, pausePractice, resumePractice } from '@/api/practice'
+import { getActivePractice, updateProgress, completePractice, pausePractice, resumePractice } from '@/api/practice'
 import { getBookById, getChapters } from '@/api/book'
 import { createCollection } from '@/api/collection'
 
@@ -248,8 +248,8 @@ export default {
           this.chapterIndex = (session.chapterIndex !== undefined && session.chapterIndex !== null)
             ? session.chapterIndex
             : (this.$route.query.chapterIndex !== undefined
-                ? Number(this.$route.query.chapterIndex)
-                : null)
+              ? Number(this.$route.query.chapterIndex)
+              : null)
           this.chapterTitle = session.chapterTitle || ''
         } else {
           // 新会话

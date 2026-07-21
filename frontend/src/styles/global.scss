@@ -394,6 +394,11 @@ img {
   padding: $spacing-lg;
 }
 
+// 窄版页面容器（子页面使用）
+.page-container-narrow {
+  max-width: 900px;
+}
+
 .page-title {
   font-size: $font-size-xxl;
   font-weight: 700;

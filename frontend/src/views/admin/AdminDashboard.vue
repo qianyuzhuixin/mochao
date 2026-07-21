@@ -108,7 +108,7 @@ export default {
       this.loading = true
       try {
         this.data = await getDashboard() || {}
-      } catch (e) {} finally {
+      } catch (e) { console.error(e) } finally {
         this.loading = false
       }
     },

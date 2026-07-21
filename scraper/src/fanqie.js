@@ -77,6 +77,33 @@ function extractFanqieBookIdsFromRank(html) {
 }
 
 /**
+ * 通过搜索 API 获取指定书籍的评分
+ * 尝试用书名全名搜索，未命中则取书名后 5 个字符作为关键词再试
+ * @param {string} bookName
+ * @param {string} bookId
+ * @returns {Promise<string>} 评分或空字符串
+ */
+async function fetchFanqieScoreFromSearch(bookName, bookId) {
+  try {
+    const keywords = [bookName];
+    if (bookName.length > 5) {
+      keywords.push(bookName.slice(-5));
+    }
+
+    for (const q of keywords) {
+      const result = await searchFanqieBooks(q, 0, 20);
+      const matched = result.books.find((b) => b.bookId === bookId);
+      if (matched && matched.score) {
+        return matched.score;
+      }
+    }
+  } catch (e) {
+    // 搜索失败不影响主流程
+  }
+  return '';
+}
+
+/**
  * 从番茄详情页 __INITIAL_STATE__.page 取明文字段
  * 详情页无字体反爬，bookName/author/abstract/categoryV2 均为正常中文
  */
@@ -91,22 +118,33 @@ async function fetchFanqieDetail(bookId) {
     if (!page) return null;
 
     // categoryV2 是转义 JSON 数组，格式如 [{"Id":1141,"Name":"西方奇幻"}]
-    let categoryV2 = '';
+    // 第一个作为主分类，其余作为标签
+    let category = '';
+    let tags = '';
     try {
       const catArr = typeof page.categoryV2 === 'string'
         ? JSON.parse(page.categoryV2)
         : page.categoryV2;
       if (Array.isArray(catArr) && catArr.length) {
-        categoryV2 = catArr.map((c) => c.Name).join('·');
+        const names = catArr.map((c) => c.Name).filter(Boolean);
+        category = names[0] || '';
+        tags = names.slice(1).join('·');
       }
     } catch {}
 
+    const bookName = page.bookName || '';
+
+    // 评分不在详情页，需通过搜索 API 补全
+    const score = await fetchFanqieScoreFromSearch(bookName, bookId);
+
     return {
       bookId,
-      bookName: page.bookName || '',
+      bookName,
       author: page.author || '',
       abstract: page.abstract || page.description || '',
-      categoryV2,
+      categoryV2: category,
+      tags,
+      score,
       wordNumber: parseInt(page.wordNumber) || 0,
       readCount: parseInt(page.readCount) || 0,
       creationStatus: page.creationStatus,
@@ -161,7 +199,7 @@ async function scrapeFanqie(rankType) {
         category: detail.categoryV2 || rank.category || '',
         wordCount: detail.wordNumber || rank.wordNumber,
         hotValue: detail.readCount || rank.read_count,
-        intro: (detail.abstract || '').slice(0, 200),
+        intro: (detail.abstract || ''),
         coverUrl: detail.thumbUri || '',
         bookUrl: `https://fanqienovel.com/page/${rank.bookId}`,
         rankNo: rank.currentPos,
@@ -234,7 +272,7 @@ async function scrapeFanqieCategory(rankType) {
         category: detail.categoryV2 || catName,
         wordCount: detail.wordNumber || rank.wordNumber,
         hotValue: detail.readCount || rank.read_count,
-        intro: (detail.abstract || '').slice(0, 200),
+        intro: (detail.abstract || ''),
         coverUrl: detail.thumbUri || '',
         bookUrl: `https://fanqienovel.com/page/${rank.bookId}`,
         rankNo: rank.currentPos,

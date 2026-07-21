@@ -83,7 +83,7 @@ export default {
         await updateProfile(this.form)
         this.$store.dispatch('auth/getProfile')
         this.$message.success('保存成功')
-      } catch (e) {} finally {
+      } catch (e) { console.error(e) } finally {
         this.saving = false
       }
     },
@@ -95,7 +95,7 @@ export default {
           await changePassword(this.pwdForm)
           this.$message.success('密码修改成功')
           this.$refs.pwdForm.resetFields()
-        } catch (e) {} finally {
+        } catch (e) { console.error(e) } finally {
           this.changingPwd = false
         }
       })

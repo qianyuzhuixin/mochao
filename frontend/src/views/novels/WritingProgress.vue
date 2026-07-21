@@ -1,14 +1,14 @@
 <template>
-  <div class="writing-progress-page page-container" v-loading="loading">
+  <div class="writing-progress-page page-container page-container-narrow" v-loading="loading">
     <div class="page-header">
-      <el-button type="text" icon="el-icon-arrow-left" @click="$router.push(`/novels/${novelId}`)">
-        返回工作台
-      </el-button>
-      <h1 class="page-title">写作进度</h1>
+      <div>
+        <el-button type="text" icon="el-icon-back" class="back-btn" @click="$router.push(`/novels/${novelId}`)">返回</el-button>
+        <h1 class="page-title">写作进度</h1>
+      </div>
     </div>
 
     <!-- 进度概览 -->
-    <progress-overview :data="progressData" class="mb-lg" />
+    <ProgressOverview :data="progressData" class="mb-lg" />
 
     <!-- 字数趋势图 -->
     <div class="chart-card">
@@ -109,7 +109,7 @@ export default {
         if (progress && progress.trend) {
           // use trend data from API
         }
-      } catch (e) {} finally {
+      } catch (e) { console.error(e) } finally {
         this.loading = false
       }
     },
@@ -213,9 +213,12 @@ export default {
 .writing-progress-page {
   .page-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: #{$spacing-md};
     margin-bottom: #{$spacing-lg};
+
+    .back-btn { margin-bottom: 4px; padding: 0; color: #4A6CF7; }
 
     .page-title { margin: 0; }
   }
