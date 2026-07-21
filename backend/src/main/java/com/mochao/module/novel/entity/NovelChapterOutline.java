@@ -16,6 +16,9 @@ public class NovelChapterOutline {
 
     private Long novelId;
 
+    /** 所属幕ID（可选） */
+    private Long actId;
+
     private Integer chapterNumber;
 
     private String title;

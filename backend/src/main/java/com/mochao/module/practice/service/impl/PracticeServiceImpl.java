@@ -76,6 +76,7 @@ public class PracticeServiceImpl implements PracticeService {
         session.setBookId(dto.getBookId());
         session.setChapterIndex(dto.getChapterIndex());
         session.setChapterTitle(chapterTitle);
+        session.setMode(dto.getMode() != null ? dto.getMode() : "copy");
         session.setStatus(Constants.PRACTICE_STATUS_ACTIVE);
         session.setTotalChars(totalChars);
         session.setTypedContent("");
@@ -102,6 +103,12 @@ public class PracticeServiceImpl implements PracticeService {
         session.setErrorCount(dto.getErrorCount());
         if (dto.getDuration() != null) {
             session.setDuration(dto.getDuration());
+        }
+        if (dto.getSummaryContent() != null) {
+            session.setSummaryContent(dto.getSummaryContent());
+        }
+        if (dto.getSelfWrittenContent() != null) {
+            session.setSelfWrittenContent(dto.getSelfWrittenContent());
         }
         session.setUpdatedAt(LocalDateTime.now());
         practiceSessionMapper.updateById(session);
@@ -150,6 +157,12 @@ public class PracticeServiceImpl implements PracticeService {
         session.setSpeed(speed);
         session.setEndTime(LocalDateTime.now());
         session.setScore(calculateScore(dto.getAccuracy(), speed));
+        if (dto.getSummaryContent() != null) {
+            session.setSummaryContent(dto.getSummaryContent());
+        }
+        if (dto.getSelfWrittenContent() != null) {
+            session.setSelfWrittenContent(dto.getSelfWrittenContent());
+        }
         session.setUpdatedAt(LocalDateTime.now());
         practiceSessionMapper.updateById(session);
 

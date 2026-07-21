@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.validation.Valid;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/books")
@@ -80,5 +81,18 @@ public class BookController {
     @GetMapping("/{id}/chapters")
     public Result<List<ChapterItem>> getChapters(@PathVariable Long id) {
         return Result.success(bookService.getChapters(id));
+    }
+
+    @GetMapping("/{id}/content")
+    public Result<Map<String, Object>> getContent(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer chapterIndex) {
+        String content = bookService.getPracticeContent(id, chapterIndex);
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("content", content);
+        if (chapterIndex != null) {
+            result.put("chapterIndex", chapterIndex);
+        }
+        return Result.success(result);
     }
 }

@@ -27,10 +27,10 @@ public class RestTemplateConfig {
         if (proxyHost != null && !proxyHost.isEmpty() && proxyPort != null && proxyPort > 0) {
             factory.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort)));
             factory.setConnectTimeout(30000);
-            factory.setReadTimeout(60000);
+            factory.setReadTimeout(300000);
         } else {
             factory.setConnectTimeout(10000);
-            factory.setReadTimeout(30000);
+            factory.setReadTimeout(300000);
         }
         return new RestTemplate(factory);
     }

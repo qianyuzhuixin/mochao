@@ -6,11 +6,13 @@ import com.mochao.common.exception.BusinessException;
 import com.mochao.common.result.ResultCode;
 import com.mochao.module.ai.dto.AiGenerateDTO;
 import com.mochao.module.ai.dto.AiRequestDTO;
-import com.mochao.module.ai.enums.AiFeatureType;
 import com.mochao.module.ai.entity.AiConfig;
+import com.mochao.module.ai.entity.AiPromptTemplate;
 import com.mochao.module.ai.entity.AiUsageLog;
+import com.mochao.module.ai.enums.AiFeatureType;
 import com.mochao.module.ai.mapper.AiUsageLogMapper;
 import com.mochao.module.ai.service.AiConfigService;
+import com.mochao.module.ai.service.AiPromptTemplateService;
 import com.mochao.module.ai.service.AiService;
 import com.mochao.module.novel.entity.*;
 import com.mochao.module.novel.mapper.*;
@@ -46,7 +48,10 @@ public class AiServiceImpl implements AiService {
     private final NovelWorldviewMapper novelWorldviewMapper;
     private final NovelCharacterMapper novelCharacterMapper;
     private final NovelChapterMapper novelChapterMapper;
+    private final NovelVolumeMapper novelVolumeMapper;
+    private final NovelActMapper novelActMapper;
     private final AiConfigService aiConfigService;
+    private final AiPromptTemplateService promptTemplateService;
     private final RestTemplate restTemplate;
 
     /** application.yml 兜底配置 */
@@ -77,7 +82,10 @@ public class AiServiceImpl implements AiService {
                          NovelWorldviewMapper novelWorldviewMapper,
                          NovelCharacterMapper novelCharacterMapper,
                          NovelChapterMapper novelChapterMapper,
+                         NovelVolumeMapper novelVolumeMapper,
+                         NovelActMapper novelActMapper,
                          AiConfigService aiConfigService,
+                         AiPromptTemplateService promptTemplateService,
                          RestTemplate restTemplate) {
         this.aiUsageLogMapper = aiUsageLogMapper;
         this.novelMapper = novelMapper;
@@ -85,7 +93,10 @@ public class AiServiceImpl implements AiService {
         this.novelWorldviewMapper = novelWorldviewMapper;
         this.novelCharacterMapper = novelCharacterMapper;
         this.novelChapterMapper = novelChapterMapper;
+        this.novelVolumeMapper = novelVolumeMapper;
+        this.novelActMapper = novelActMapper;
         this.aiConfigService = aiConfigService;
+        this.promptTemplateService = promptTemplateService;
         this.restTemplate = restTemplate;
     }
 
@@ -151,38 +162,193 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public Map<String, Object> generate(AiGenerateDTO dto, Long userId) {
-        // 🔧 使用枚举替代魔法字符串，编译器校验，IDE 跳转
         AiFeatureType featureType = AiFeatureType.fromGenerateType(dto.getType());
 
-        String systemPrompt;
-        String userPrompt;
-        String contextSummary = buildContextSummary(dto.getNovelId());
+        // 从模板获取 systemPrompt（用户自定义 > 系统默认 > 硬编码兜底）
+        String systemPrompt = getSystemPrompt(userId, featureType.getCode());
 
-        switch (featureType) {
-            case GENERATE_OUTLINE:
-                systemPrompt = "你是一位网文大纲策划专家。请根据提供的信息生成小说大纲。";
-                userPrompt = "上下文：\n" + contextSummary + "\n\n用户要求：" + dto.getPrompt() + "\n\n请生成小说大纲：";
-                break;
-            case GENERATE_CHARACTER:
-                systemPrompt = "你是一位人物设定专家。请根据提供的信息生成一个完整的人物设定，包括外貌、性格、背景、关系等。";
-                userPrompt = "上下文：\n" + contextSummary + "\n\n用户要求：" + dto.getPrompt() + "\n\n请生成人物设定：";
-                break;
-            case GENERATE_WORLDVIEW:
-                systemPrompt = "你是一位世界观架构专家。请根据提供的信息生成一个完整的世界观设定。";
-                userPrompt = "上下文：\n" + contextSummary + "\n\n用户要求：" + dto.getPrompt() + "\n\n请生成世界观设定：";
-                break;
-            case GENERATE_CHAPTER_OUTLINE:
-                systemPrompt = "你是一位章节大纲专家。请根据提供的信息生成章节大纲。";
-                userPrompt = "上下文：\n" + contextSummary + "\n\n用户要求：" + dto.getPrompt() + "\n\n请生成章节大纲：";
-                break;
-            default:
-                throw new BusinessException(ResultCode.BAD_REQUEST, "不支持的生成类型: " + dto.getType());
-        }
+        // 构建上下文（小说信息 + 各层级内容链式引用）
+        String contextSummary = buildGenerateContext(dto, featureType);
+
+        // 构建用户提示词
+        String userPrompt = buildGenerateUserPrompt(dto, featureType, contextSummary);
 
         String result = callAiWithRetry(systemPrompt, userPrompt, userId);
         AiUsageLog logEntry = saveLog(userId, dto.getNovelId(), null,
                 featureType, dto.getPrompt(), result, contextSummary);
         return buildResult(result, logEntry.getId());
+    }
+
+    /**
+     * 获取提示词模板：用户自定义 > 系统默认 > 硬编码兜底
+     */
+    private String getSystemPrompt(Long userId, String featureCode) {
+        AiPromptTemplate tpl = promptTemplateService.getTemplate(userId, featureCode);
+        if (tpl != null && tpl.getSystemPrompt() != null && !tpl.getSystemPrompt().isEmpty()) {
+            return tpl.getSystemPrompt();
+        }
+        // 硬编码兜底
+        return getFallbackSystemPrompt(featureCode);
+    }
+
+    /**
+     * 硬编码兜底提示词（当模板不存在时使用）
+     */
+    private String getFallbackSystemPrompt(String featureCode) {
+        switch (featureCode) {
+            case "generate-outline":
+                return "你是一位网文大纲策划专家。请根据提供的信息直接生成小说大纲正文，使用 Markdown 格式。\n" +
+                        "注意：不要添加任何开场白（如\"好的，根据您的要求\"）、结束语、总结性陈述或解释性语句。只输出大纲内容。";
+            case "generate-volume-outline":
+                return "你是一位网文卷纲策划专家。请根据提供的小说大纲直接生成卷纲正文，使用 Markdown 格式。\n" +
+                        "注意：不要添加任何开场白、结束语、总结性陈述或解释性语句。只输出卷纲内容。";
+            case "generate-act-outline":
+                return "你是一位网文幕纲策划专家。请根据提供的小说大纲和卷纲直接生成幕纲正文，使用 Markdown 格式。\n" +
+                        "注意：不要添加任何开场白、结束语、总结性陈述或解释性语句。只输出幕纲内容。";
+            case "generate-detailed-outline":
+                return "你是一位网文细纲策划专家。请根据提供的小说大纲、卷纲、幕纲直接生成章节细纲正文，使用 Markdown 格式。\n" +
+                        "注意：不要添加任何开场白、结束语、总结性陈述或解释性语句。只输出细纲内容。";
+            case "generate-character":
+                return "你是一位人物设定专家。请根据提供的信息生成一个完整的人物设定。";
+            case "generate-worldview":
+                return "你是一位世界观架构专家。请根据提供的信息生成一个完整的世界观设定。";
+            case "generate-chapter_outline":
+                return "你是一位章节大纲专家。请根据提供的信息生成章节大纲。";
+            default:
+                return "你是一位专业的网文创作助手。请根据提供的信息生成内容。";
+        }
+    }
+
+    /**
+     * 构建生成类上下文（支持层级链式引用）
+     *
+     * 生成大纲时：小说简介 + 类型 + 书名
+     * 生成卷纲时：大纲内容 + 用户输入
+     * 生成幕纲时：卷纲内容 + 用户输入
+     * 生成细纲时：幕纲内容 + 用户输入
+     */
+    private String buildGenerateContext(AiGenerateDTO dto, AiFeatureType featureType) {
+        StringBuilder ctx = new StringBuilder();
+
+        // 1. 基础信息（小说名+类型+简介）— 所有生成类型都需要
+        Novel novel = novelMapper.selectById(dto.getNovelId());
+        if (novel != null) {
+            ctx.append("【小说基本信息】\n");
+            ctx.append("书名：").append(novel.getTitle()).append("\n");
+            if (novel.getGenre() != null) {
+                ctx.append("类型：").append(novel.getGenre()).append("\n");
+            }
+            if (novel.getSummary() != null) {
+                ctx.append("简介：").append(novel.getSummary()).append("\n");
+            }
+            ctx.append("\n");
+        }
+
+        // 2. 大纲内容（生成卷纲/幕纲/细纲/章纲时需要）
+        if (needsOutlineContext(featureType)) {
+            NovelOutline outline = novelOutlineMapper.selectOne(
+                    new LambdaQueryWrapper<NovelOutline>().eq(NovelOutline::getNovelId, dto.getNovelId()));
+            if (outline != null && outline.getContent() != null && !outline.getContent().isEmpty()) {
+                ctx.append("【小说大纲】\n").append(outline.getContent()).append("\n\n");
+            }
+        }
+
+        // 3. 父级内容（用户指定了 parentType + parentId）
+        if (dto.getParentType() != null && dto.getParentId() != null) {
+            appendParentContext(ctx, dto);
+        }
+
+        // 4. 卷纲上下文（生成幕纲和细纲时，如果没指定parent，加载所有卷纲作为参考）
+        if (featureType == AiFeatureType.GENERATE_ACT_OUTLINE && dto.getParentId() == null) {
+            appendAllVolumesContext(ctx, dto.getNovelId());
+        }
+
+        return ctx.toString();
+    }
+
+    /** 是否需要大纲上下文 */
+    private boolean needsOutlineContext(AiFeatureType featureType) {
+        return featureType == AiFeatureType.GENERATE_VOLUME_OUTLINE
+                || featureType == AiFeatureType.GENERATE_ACT_OUTLINE
+                || featureType == AiFeatureType.GENERATE_DETAILED_OUTLINE
+                || featureType == AiFeatureType.GENERATE_CHAPTER_OUTLINE;
+    }
+
+    /** 附加父级上下文 */
+    private void appendParentContext(StringBuilder ctx, AiGenerateDTO dto) {
+        if ("volume".equals(dto.getParentType())) {
+            NovelVolume volume = novelVolumeMapper.selectById(dto.getParentId());
+            if (volume != null && volume.getOutline() != null && !volume.getOutline().isEmpty()) {
+                ctx.append("【所属卷纲 — 第").append(volume.getVolumeNumber()).append("卷 ").append(volume.getTitle()).append("】\n");
+                ctx.append(volume.getOutline()).append("\n\n");
+            }
+        } else if ("act".equals(dto.getParentType())) {
+            NovelAct act = novelActMapper.selectById(dto.getParentId());
+            if (act != null && act.getOutline() != null && !act.getOutline().isEmpty()) {
+                ctx.append("【所属幕纲 — 第").append(act.getActNumber()).append("幕 ").append(act.getTitle()).append("】\n");
+                ctx.append(act.getOutline()).append("\n\n");
+                // 顺便加载所属卷纲
+                NovelVolume volume = novelVolumeMapper.selectById(act.getVolumeId());
+                if (volume != null && volume.getOutline() != null && !volume.getOutline().isEmpty()) {
+                    ctx.append("【所属卷纲 — 第").append(volume.getVolumeNumber()).append("卷 ").append(volume.getTitle()).append("】\n");
+                    ctx.append(volume.getOutline()).append("\n\n");
+                }
+            }
+        }
+    }
+
+    /** 加载所有卷纲作为参考 */
+    private void appendAllVolumesContext(StringBuilder ctx, Long novelId) {
+        List<NovelVolume> volumes = novelVolumeMapper.selectList(
+                new LambdaQueryWrapper<NovelVolume>()
+                        .eq(NovelVolume::getNovelId, novelId)
+                        .orderByAsc(NovelVolume::getSortOrder));
+        if (!volumes.isEmpty()) {
+            ctx.append("【全部卷纲概览】\n");
+            for (NovelVolume v : volumes) {
+                ctx.append("--- 第").append(v.getVolumeNumber()).append("卷 ").append(v.getTitle()).append(" ---\n");
+                if (v.getOutline() != null) {
+                    ctx.append(truncate(v.getOutline(), 800)).append("\n");
+                }
+            }
+            ctx.append("\n");
+        }
+    }
+
+    /** 构建用户提示词 */
+    private String buildGenerateUserPrompt(AiGenerateDTO dto, AiFeatureType featureType, String context) {
+        String instruction;
+        switch (featureType) {
+            case GENERATE_OUTLINE:
+                instruction = "请根据以上小说的基本信息，生成一部完整的小说大纲（包含故事主线、分卷规划、核心冲突、人物关系网）。";
+                break;
+            case GENERATE_VOLUME_OUTLINE:
+                instruction = "请根据以上小说大纲，为指定卷生成详细的卷纲（包含本卷主题、幕结构、情节节点、伏笔设计）。";
+                break;
+            case GENERATE_ACT_OUTLINE:
+                instruction = "请根据以上大纲和卷纲，为指定幕生成详细的幕纲（包含核心冲突、场景序列、章节分布建议）。";
+                break;
+            case GENERATE_DETAILED_OUTLINE:
+                instruction = "请根据以上大纲、卷纲、幕纲，生成详细的章节细纲（每章标注核心任务、情感目标、开头钩子、章节结尾钩子）。";
+                break;
+            case GENERATE_CHARACTER:
+                instruction = "请根据以上信息，生成一个完整的人物设定（包括外貌、性格、背景、关系等）。";
+                break;
+            case GENERATE_WORLDVIEW:
+                instruction = "请根据以上信息，生成一个完整的世界观设定。";
+                break;
+            case GENERATE_CHAPTER_OUTLINE:
+                instruction = "请根据以上信息，生成章节大纲。";
+                break;
+            default:
+                instruction = "请根据以上信息生成内容。";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("上下文：\n").append(context).append("\n");
+        sb.append("用户要求：").append(dto.getPrompt()).append("\n\n");
+        sb.append(instruction);
+        return sb.toString();
     }
 
     @Override
@@ -238,10 +404,10 @@ public class AiServiceImpl implements AiService {
         if (proxyHost != null && !proxyHost.isEmpty() && proxyPort != null && proxyPort > 0) {
             factory.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort)));
             factory.setConnectTimeout(30000);
-            factory.setReadTimeout(60000);
+            factory.setReadTimeout(300000);
         } else {
             factory.setConnectTimeout(10000);
-            factory.setReadTimeout(30000);
+            factory.setReadTimeout(300000);
         }
         return new RestTemplate(factory);
     }

@@ -16,13 +16,15 @@
 - P1 已修: AI重试+枚举+Token统计、限流、Scraper拆分、JWT一次解析
 - P0(V2新增已修): AiRuntimeConfig Bug(this.model=apiKey→model)、dev.yml明文凭据→环境变量
 - P0(V2新增已修): package-lock.json恢复追踪、cookie_cache.json加入gitignore
-- P2 未修: 前端分包优化、Redis缓存策略、Vue 2→3迁移、监控告警
+- P2 已修(部分): 前端分包优化(Webpack splitChunks+ECharts按需+gzip)、ESLint配置
+- P2 未修: Redis缓存策略、Vue 2→3迁移、监控告警
 
 ## 已交付
 - 2026-07-14: 全量代码评审 + P0+P1 代码修改 + 《团队技术提升方案.md》
 - 2026-07-15: 二次深度扫描 + P0紧急修复(3项) + 《团队技术提升方案V2.md》
+- 2026-07-21: 工程质量基础设施搭建 + 测试覆盖从20→101 + 《团队技术提升报告V3.md》
 
-## 已完成代码修改汇总
+## 已完成代码修改汇总 (最新)
 - JWT: 弱密钥移除 + @PostConstruct强度校验 + parseClaims单次解析优化
 - CI/CD: GitHub Actions 4-Job流水线
 - 测试: 后端 JwtTokenProviderTest(11个) + 前端 auth.spec.js(9个)
@@ -31,6 +33,9 @@
 - Scraper: 2149行 → 25行入口 + 9模块
 - 安全: dev.yml明文凭据清除 + package-lock.json恢复 + gitignore补全
 - 排行榜乱码: fanqie.js PUA检测+过滤 + 后端PUA检测+清洗API + 三层自动自愈机制
+- 工程质量(V3): ESLint+Prettier+EditorConfig + 前端测试28个 + Scraper测试52个 + 后端AuthService测试10个
+- 构建优化(V3): Webpack splitChunks(4个chunk) + ECharts按需引入 + gzip压缩
+- 测试总览: 前端28 + 后端21 + Scraper52 = 101个测试
 
 ## 关键技术知识
 - 番茄小说字体反爬: 榜单页bookName/author使用PUA区(U+E000~U+F8FF)映射，需从详情页获取明文

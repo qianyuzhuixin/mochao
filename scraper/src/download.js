@@ -15,18 +15,28 @@ const cheerio = require('cheerio');
 const { fetchText, httpFetchText, PC_HEADERS, MOBILE_HEADERS, extractInitialState } = require('./utils');
 const { fetchFanqieDetail } = require('./fanqie');
 
-/** 加载字体解密映射表 */
+/** 加载新版字体解密映射表（PUA Unicode -> 真实字符） */
+let FANQIE_FONT_MAP = null;
+try {
+  const fontMapPath = path.join(__dirname, '..', 'font-map.json');
+  FANQIE_FONT_MAP = JSON.parse(fs.readFileSync(fontMapPath, 'utf8'));
+  console.log('[scraper] font-map.json 加载成功');
+} catch (e) {
+  console.warn('[scraper] font-map.json 加载失败，番茄章节内容将无法解密:', e.message);
+}
+
+/** 旧版 charset.json 作为兜底（兼容老数据/备用映射） */
 let FANQIE_CHARSET = null;
 try {
   const charsetPath = path.join(__dirname, '..', 'charset.json');
   FANQIE_CHARSET = JSON.parse(fs.readFileSync(charsetPath, 'utf8'));
-  console.log('[scraper] charset.json 加载成功');
 } catch (e) {
-  console.warn('[scraper] charset.json 加载失败，番茄章节内容将无法解密:', e.message);
+  // 静默失败，新版映射表已足够
 }
 
-/** 番茄字体 PUA 编码范围: mode 0 和 mode 1 */
-const FANQIE_CODE = [[58344, 58715], [58345, 58716]];
+/** 番茄字体 PUA 编码范围 */
+const FANQIE_CODE_START = 58344;
+const FANQIE_CODE_END = 58715;
 
 /** User-Agent 轮换池（PC / 移动 / 微信内嵌浏览器），防风控 */
 const UA_POOL = [
@@ -188,26 +198,32 @@ function recordSuccess() {
 // ===========================
 
 /**
- * 番茄字体解密 — 将 PUA 字符映射回真实汉字
+ * 番茄字体解密 — 将 PUA 字符映射回真实字符
+ * 优先使用新版 font-map.json（PUA Unicode 十进制 -> 真实字符）
+ * 新版映射表覆盖番茄当前字体反爬的 58344~58715 区间
  * @param {string} content 加密内容
- * @param {number} mode 0 或 1
  * @returns {string} 解密后内容
  */
-function decodeFanqieText(content, mode = 0) {
-  if (!FANQIE_CHARSET) return content;
-  const charset = FANQIE_CHARSET[mode];
-  if (!charset) return content;
-  const [codeStart, codeEnd] = FANQIE_CODE[mode];
+function decodeFanqieText(content) {
+  if (!FANQIE_FONT_MAP && !FANQIE_CHARSET) return content;
   let result = '';
   for (const char of content) {
     const uni = char.charCodeAt(0);
-    if (uni >= codeStart && uni <= codeEnd) {
-      const bias = uni - codeStart;
-      if (bias < charset.length && charset[bias] !== '?') {
-        result += charset[bias];
-      } else {
-        result += char;
+    if (uni >= FANQIE_CODE_START && uni <= FANQIE_CODE_END) {
+      const key = String(uni);
+      if (FANQIE_FONT_MAP && FANQIE_FONT_MAP[key]) {
+        result += FANQIE_FONT_MAP[key];
+        continue;
       }
+      // 兜底：旧版 mode0 偏移映射
+      if (FANQIE_CHARSET && FANQIE_CHARSET[0]) {
+        const bias = uni - FANQIE_CODE_START;
+        if (bias < FANQIE_CHARSET[0].length && FANQIE_CHARSET[0][bias] !== '?') {
+          result += FANQIE_CHARSET[0][bias];
+          continue;
+        }
+      }
+      result += char;
     } else {
       result += char;
     }
@@ -236,13 +252,9 @@ function stripFanqieHtml(html) {
   return text.trim();
 }
 
-/** 解密并选择最佳模式（对比 mode 0 和 mode 1 的中文字符占比） */
+/** 解密并返回清洗后的文本 */
 function decodeBest(content) {
-  const decoded0 = decodeFanqieText(content, 0);
-  const decoded1 = decodeFanqieText(content, 1);
-  const cnCount0 = (decoded0.match(/[\u4e00-\u9fff]/g) || []).length;
-  const cnCount1 = (decoded1.match(/[\u4e00-\u9fff]/g) || []).length;
-  return cnCount0 >= cnCount1 ? decoded0 : decoded1;
+  return stripFanqieHtml(decodeFanqieText(content));
 }
 
 /** 截断检测：侧重结构性截断指标 */
@@ -313,7 +325,8 @@ async function _downloadViaReaderPage(chapterId, headers) {
 
     if (paragraphs.length > 3) { // 至少有几个段落才认为是有效内容
       const content = paragraphs.join('\n');
-      return content;
+      // Reader 页面直接返回的文本仍可能是 PUA 编码，需要解密
+      return decodeFanqieText(content);
     }
   } catch (e) {
     // 静默失败
@@ -322,7 +335,7 @@ async function _downloadViaReaderPage(chapterId, headers) {
 }
 
 /**
- * 策略B: __INITIAL_STATE__ + charset 解密
+ * 策略B: __INITIAL_STATE__ + font-map 解密
  * 从 Reader 页面的 __INITIAL_STATE__ 提取加密内容，用 charset.json 解密
  * 
  * @param {string} chapterId
@@ -340,8 +353,7 @@ async function _downloadViaInitialState(chapterId, headers) {
       null;
 
     if (content && content.length > 50) {
-      const decoded = decodeBest(content);
-      const text = stripFanqieHtml(decoded);
+      const text = decodeBest(content);
       if (text.length > 50) return text;
     }
   } catch (e) {
@@ -351,8 +363,8 @@ async function _downloadViaInitialState(chapterId, headers) {
 }
 
 /**
- * 策略C: 官方 API endpoint + charset 解密
- * 
+ * 策略C: 官方 API endpoint + font-map 解密
+ *
  * @param {string} chapterId
  * @param {object} headers
  * @returns {Promise<string|null>}
@@ -370,8 +382,7 @@ async function _downloadViaApi(chapterId, headers) {
     const apiData = JSON.parse(apiHtml);
     const content = apiData?.data?.chapterData?.content;
     if (content && content.length > 50) {
-      const decoded = decodeBest(content);
-      const text = stripFanqieHtml(decoded);
+      const text = decodeBest(content);
       if (text.length > 50) return text;
     }
   } catch (e) {
@@ -462,18 +473,17 @@ async function _downloadViaProxy(chapterId, maxRetries = 3) {
  * @returns {Promise<string|null>}
  */
 async function fetchFanqieChapterContent(chapterId, testChapterId) {
-  // --- 策略0: 代理API（仿 Python 项目的 down_text，最高优先级） ---
-  // 代理直接返回已解码内容，成功后直接返回，不走后续策略
-  console.log(`[download] 章节 ${chapterId} → 尝试代理API`);
-  const proxyContent = await _downloadViaProxy(chapterId, 3);
-  if (proxyContent) {
-    console.log(`[download] 章节 ${chapterId} ✓ 代理API成功 (${proxyContent.length}字)`);
-    recordSuccess();
-    return proxyContent;
-  }
-  console.warn(`[download] 章节 ${chapterId} 代理API失败，回退到 charset 策略`);
-
-  // --- 代理失败时回退：charset 解密策略 ---
+  // --- 跳过代理API：直走 charset 策略 ---
+  // 代理API (yuefanqie.jingluo.love) 不稳定频繁超时，charset cheerio DOM 提取已足够可靠
+  // 如需重新启用代理API，取消下面注释即可：
+  // console.log(`[download] 章节 ${chapterId} → 尝试代理API`);
+  // const proxyContent = await _downloadViaProxy(chapterId, 3);
+  // if (proxyContent) {
+  //   console.log(`[download] 章节 ${chapterId} ✓ 代理API成功 (${proxyContent.length}字)`);
+  //   recordSuccess();
+  //   return proxyContent;
+  // }
+  // console.warn(`[download] 章节 ${chapterId} 代理API失败，回退到 charset 策略`);
   let bestContent = null;
 
   // 获取验证过的 cookie
@@ -497,57 +507,76 @@ async function fetchFanqieChapterContent(chapterId, testChapterId) {
 
     console.log(`[download] 章节 ${chapterId} charset回退 (UA=${uaLabel}, attempt=${retry + 1})`);
 
-    // --- 策略1: cheerio DOM 提取 Reader 页面 ---
+    // --- 全部策略并行收集，取最长内容 ---
+    // 之前的 bug：cheerio 拿到几百字就 return，charset 解码根本没机会跑
+    // 新策略：所有策略结果都收集，最后取最优（最长且通过校验的）
+
+    // 策略1: cheerio DOM 提取 Reader 页面
     const domContent = await _downloadViaReaderPage(chapterId, headers);
-    if (domContent && domContent.length > 100) {
-      if (!isTruncated(domContent) && isChapterContentValid(domContent)) {
-        console.log(`[download] 章节 ${chapterId} ✓ cheerio DOM提取成功 (${domContent.length}字)`);
-        recordSuccess();
-        return domContent;
-      }
+    if (domContent && domContent.length > 50) {
+      const tag = domContent.length < 500 ? '⚠ 偏短' : '✓';
+      console.log(`[download] 章节 ${chapterId} cheerio ${tag} (${domContent.length}字)`);
       if (!bestContent || domContent.length > bestContent.length) {
         bestContent = domContent;
       }
+      // 内容足够长且通过校验 → 直接返回（不必等 charset）
+      if (domContent.length >= 500 && !isTruncated(domContent) && isChapterContentValid(domContent)) {
+        recordSuccess();
+        return domContent;
+      }
     }
 
-    // --- 策略2: API endpoint + charset 解密 ---
+    // 策略2: API endpoint + charset 解密
     const apiContent = await _downloadViaApi(chapterId, headers);
     if (apiContent && apiContent.length > 50) {
-      if (!isTruncated(apiContent) && isChapterContentValid(apiContent)) {
-        console.log(`[download] 章节 ${chapterId} ✓ API成功 (${apiContent.length}字)`);
-        recordSuccess();
-        return apiContent;
-      }
+      console.log(`[download] 章节 ${chapterId} API+charset (${apiContent.length}字)`);
       if (!bestContent || apiContent.length > bestContent.length) {
         bestContent = apiContent;
       }
+      if (apiContent.length >= 500 && !isTruncated(apiContent) && isChapterContentValid(apiContent)) {
+        recordSuccess();
+        return apiContent;
+      }
     }
 
-    // --- 策略3: __INITIAL_STATE__ + charset 解密 ---
+    // 策略3: __INITIAL_STATE__ + charset 解密
     const stateContent = await _downloadViaInitialState(chapterId, headers);
     if (stateContent && stateContent.length > 50) {
-      if (!isTruncated(stateContent) && isChapterContentValid(stateContent)) {
-        console.log(`[download] 章节 ${chapterId} ✓ __INITIAL_STATE__成功 (${stateContent.length}字)`);
-        recordSuccess();
-        return stateContent;
-      }
+      console.log(`[download] 章节 ${chapterId} INITIAL_STATE+charset (${stateContent.length}字)`);
       if (!bestContent || stateContent.length > bestContent.length) {
         bestContent = stateContent;
       }
+      if (stateContent.length >= 500 && !isTruncated(stateContent) && isChapterContentValid(stateContent)) {
+        recordSuccess();
+        return stateContent;
+      }
     }
 
-    // 本轮全部失败 → 记录失败，可能刷新 cookie
+    // 三个策略都跑完了 → 检查 bestContent 是否足够好
+    if (bestContent && bestContent.length >= 500 && !isTruncated(bestContent) && isChapterContentValid(bestContent)) {
+      console.log(`[download] 章节 ${chapterId} ✓ 取最优策略结果 (${bestContent.length}字)`);
+      recordSuccess();
+      return bestContent;
+    }
+
+    // 首轮所有策略都试过，偏短则直接放弃重试（不同 UA 拿到的内容几乎一样，重试无意义）
+    if (retry === 0 && bestContent && bestContent.length < 500) {
+      console.warn(`[download] 章节 ${chapterId} ⚠ 内容偏短 (${bestContent.length}字)，跳过剩余重试直接返回`);
+      break;
+    }
+
+    // 本轮没拿到满意结果 → 记录失败，可能刷新 cookie 后重试
     await recordFailureAndMaybeRefreshCookie(testChapterId);
     cookie = getValidCookie();
 
     if (retry < 2) {
       const delay = 1000 * Math.pow(2, retry);
-      console.warn(`[download] 章节 ${chapterId} 重试 (${delay}ms后)`);
+      console.warn(`[download] 章节 ${chapterId} 本轮不满意 (best=${(bestContent || '').length}字)，${delay}ms后重试`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
 
-  // 所有策略均失败：返回最佳已有内容
+  // 所有重试结束：返回最佳已有内容（即使不完美）
   if (bestContent) {
     console.warn(`[download] 章节 ${chapterId} ⚠ 返回已有最佳内容 (${bestContent.length}字，可能不完整)`);
     return bestContent;
@@ -776,39 +805,80 @@ async function downloadFanqieBook(bookId, maxChapters = 0) {
 
   console.log(`[download] 将下载 ${chaptersToDownload.length} 章（+ 第0章书籍信息）`);
 
-  // Step 2: 逐章下载，单章彻底失败即中止
+  // Step 2: 多线程并发下载（可配置并发数）
+  const CONCURRENCY = 3; // 同时下载章节数
   const succeededChapters = [];
   let abortReason = null;
+  let globalAbort = false; // 全局中止标志，任意线程检测到彻底失败后通知所有线程停止
 
-  for (let i = 0; i < chaptersToDownload.length; i++) {
-    const ch = chaptersToDownload[i];
-    console.log(`[download] 下载第 ${i + 1}/${chaptersToDownload.length} 章: ${ch.title} (${ch.chapterId})`);
+  // 将章节分批并发下载
+  for (let batchStart = 0; batchStart < chaptersToDownload.length; batchStart += CONCURRENCY) {
+    const batch = chaptersToDownload.slice(batchStart, batchStart + CONCURRENCY);
+    const batchPromises = batch.map((ch) => {
+      const idx = chaptersToDownload.indexOf(ch);
+      // 如果已全局中止，直接跳过
+      if (globalAbort) return Promise.resolve(null);
 
-    // 每章之间加间隔（仿原项目的防风控策略）
-    if (i > 0) {
-      await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
-    }
+      console.log(`[download] 下载第 ${idx + 1}/${chaptersToDownload.length} 章: ${ch.title} (${ch.chapterId})`);
 
-    let content = null;
-    try {
-      content = await fetchFanqieChapterContent(ch.chapterId, testChapterId);
-    } catch (e) {
-      console.warn(`[download] 章节 ${ch.chapterId} (${ch.title}) 下载异常: ${e.message}`);
-    }
+      return fetchFanqieChapterContent(ch.chapterId, testChapterId)
+        .then((content) => {
+          if (globalAbort) return null;
+          if (content === null) {
+            console.error(`[download] 章节 ${ch.chapterId} (${ch.title}) 完全失败，触发全局中止`);
+            globalAbort = true;
+            abortReason = `第${idx + 1}章「${ch.title}」获取失败，已中止下载`;
+            return null;
+          }
+          // 内容偏短（<500字）视为实质失败，触发全局中止
+          if (content.length < 500) {
+            console.error(`[download] 章节 ${ch.chapterId} (${ch.title}) 内容偏短 (${content.length}字)，触发全局中止`);
+            globalAbort = true;
+            abortReason = `第${idx + 1}章「${ch.title}」内容不完整 (${content.length}字)，已中止下载`;
+            return null;
+          }
+          return { chapterId: ch.chapterId, title: ch.title, content, wordCount: content.length, idx };
+        })
+        .catch((e) => {
+          console.warn(`[download] 章节 ${ch.chapterId} (${ch.title}) 下载异常: ${e.message}`);
+          return null;
+        });
+    });
 
-    if (content === null) {
-      // 单章彻底失败 → 中止下载，返回已成功部分
-      console.error(`[download] 章节 ${ch.chapterId} (${ch.title}) 完全失败，中止下载`);
-      abortReason = `第${i + 1}章「${ch.title}」获取失败，已中止下载`;
+    // 等待当前批次全部完成
+    const batchResults = await Promise.all(batchPromises);
+
+    // 检查是否有触发全局中止的
+    if (globalAbort) {
+      // 收集本批次已完成的结果（abort 之前的）
+      for (const r of batchResults) {
+        if (r && r.content) {
+          succeededChapters.push({
+            chapterId: r.chapterId,
+            title: r.title,
+            content: r.content,
+            wordCount: r.wordCount,
+          });
+        }
+      }
       break;
     }
 
-    succeededChapters.push({
-      chapterId: ch.chapterId,
-      title: ch.title,
-      content,
-      wordCount: content.length,
-    });
+    // 按下载顺序整理结果
+    const sorted = batchResults.filter(Boolean).sort((a, b) => a.idx - b.idx);
+    for (const r of sorted) {
+      succeededChapters.push({
+        chapterId: r.chapterId,
+        title: r.title,
+        content: r.content,
+        wordCount: r.wordCount,
+      });
+    }
+
+    // 批次间加间隔（防风控）
+    if (batchStart + CONCURRENCY < chaptersToDownload.length) {
+      await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
+    }
   }
 
   // 第0章（书籍信息） + 成功下载的正文章节
@@ -1112,4 +1182,10 @@ module.exports = {
   generateTxtContent,
   generateHtmlContent,
   generatePdfContent,
+  // 以下为内部函数，导出用于测试
+  decodeFanqieText,
+  decodeBest,
+  isTruncated,
+  isChapterContentValid,
+  stripFanqieHtml,
 };

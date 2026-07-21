@@ -39,7 +39,7 @@ public class CollectionServiceImpl implements CollectionService {
         collection.setType(dto.getType());
         collection.setContext(dto.getContext());
         collection.setNote(dto.getNote());
-        collection.setTags(dto.getTags());
+        collection.setTags(joinTags(dto.getTags()));
         collection.setSourceTitle(dto.getSourceTitle());
         collection.setSourceBook(dto.getSourceBook());
         collection.setSourceAuthor(dto.getSourceAuthor());
@@ -48,7 +48,7 @@ public class CollectionServiceImpl implements CollectionService {
         collectionMapper.insert(collection);
 
         // 更新标签使用计数
-        if (StringUtils.hasText(dto.getTags())) {
+        if (dto.getTags() != null && !dto.getTags().isEmpty()) {
             updateTags(userId, dto.getTags());
         }
 
@@ -97,7 +97,7 @@ public class CollectionServiceImpl implements CollectionService {
             collection.setNote(dto.getNote());
         }
         if (dto.getTags() != null) {
-            collection.setTags(dto.getTags());
+            collection.setTags(joinTags(dto.getTags()));
         }
         collection.setUpdatedAt(LocalDateTime.now());
         collectionMapper.updateById(collection);
@@ -215,9 +215,8 @@ public class CollectionServiceImpl implements CollectionService {
         return collection;
     }
 
-    private void updateTags(Long userId, String tagsStr) {
-        String[] tagNames = tagsStr.split("[,，]");
-        Set<String> uniqueTags = Arrays.stream(tagNames)
+    private void updateTags(Long userId, List<String> tagList) {
+        Set<String> uniqueTags = tagList.stream()
                 .map(String::trim)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
@@ -239,5 +238,12 @@ public class CollectionServiceImpl implements CollectionService {
                 collectionTagMapper.updateById(existingTag);
             }
         }
+    }
+
+    private String joinTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return null;
+        }
+        return String.join(",", tags);
     }
 }

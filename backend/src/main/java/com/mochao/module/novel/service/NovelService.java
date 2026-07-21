@@ -45,6 +45,19 @@ public interface NovelService {
     NovelChapterOutline updateChapterOutline(Long outlineId, NovelChapterOutlineDTO dto, Long userId);
     void deleteChapterOutline(Long outlineId, Long userId);
 
+    // Volume Outlines（卷纲）
+    List<NovelVolume> getVolumes(Long novelId, Long userId);
+    NovelVolume createVolume(Long novelId, NovelVolumeDTO dto, Long userId);
+    NovelVolume updateVolume(Long volumeId, NovelVolumeDTO dto, Long userId);
+    void deleteVolume(Long volumeId, Long userId);
+
+    // Acts（幕）
+    List<NovelAct> getActs(Long novelId, Long userId);
+    List<NovelAct> getActsByVolume(Long volumeId, Long userId);
+    NovelAct createAct(Long novelId, NovelActDTO dto, Long userId);
+    NovelAct updateAct(Long actId, NovelActDTO dto, Long userId);
+    void deleteAct(Long actId, Long userId);
+
     // Chapters
     Page<NovelChapter> getChapters(Long novelId, Long userId, Integer page, Integer size);
     NovelChapter getChapter(Long chapterId, Long userId);

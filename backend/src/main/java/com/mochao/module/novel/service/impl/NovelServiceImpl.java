@@ -31,6 +31,8 @@ public class NovelServiceImpl implements NovelService {
     private final NovelChapterOutlineMapper novelChapterOutlineMapper;
     private final NovelChapterMapper novelChapterMapper;
     private final NovelDailyProgressMapper novelDailyProgressMapper;
+    private final NovelVolumeMapper novelVolumeMapper;
+    private final NovelActMapper novelActMapper;
 
     public NovelServiceImpl(NovelMapper novelMapper,
                             NovelOutlineMapper novelOutlineMapper,
@@ -39,7 +41,9 @@ public class NovelServiceImpl implements NovelService {
                             NovelItemMapper novelItemMapper,
                             NovelChapterOutlineMapper novelChapterOutlineMapper,
                             NovelChapterMapper novelChapterMapper,
-                            NovelDailyProgressMapper novelDailyProgressMapper) {
+                            NovelDailyProgressMapper novelDailyProgressMapper,
+                            NovelVolumeMapper novelVolumeMapper,
+                            NovelActMapper novelActMapper) {
         this.novelMapper = novelMapper;
         this.novelOutlineMapper = novelOutlineMapper;
         this.novelWorldviewMapper = novelWorldviewMapper;
@@ -48,6 +52,8 @@ public class NovelServiceImpl implements NovelService {
         this.novelChapterOutlineMapper = novelChapterOutlineMapper;
         this.novelChapterMapper = novelChapterMapper;
         this.novelDailyProgressMapper = novelDailyProgressMapper;
+        this.novelVolumeMapper = novelVolumeMapper;
+        this.novelActMapper = novelActMapper;
     }
 
     // ==================== Novel CRUD ====================
@@ -114,6 +120,8 @@ public class NovelServiceImpl implements NovelService {
         novelChapterOutlineMapper.delete(new LambdaQueryWrapper<NovelChapterOutline>().eq(NovelChapterOutline::getNovelId, id));
         novelChapterMapper.delete(new LambdaQueryWrapper<NovelChapter>().eq(NovelChapter::getNovelId, id));
         novelDailyProgressMapper.delete(new LambdaQueryWrapper<NovelDailyProgress>().eq(NovelDailyProgress::getNovelId, id));
+        novelActMapper.delete(new LambdaQueryWrapper<NovelAct>().eq(NovelAct::getNovelId, id));
+        novelVolumeMapper.delete(new LambdaQueryWrapper<NovelVolume>().eq(NovelVolume::getNovelId, id));
         novelMapper.deleteById(id);
     }
 
@@ -337,6 +345,7 @@ public class NovelServiceImpl implements NovelService {
         getOwnedNovel(novelId, userId);
         NovelChapterOutline outline = new NovelChapterOutline();
         outline.setNovelId(novelId);
+        outline.setActId(dto.getActId());
         outline.setChapterNumber(dto.getChapterNumber());
         outline.setTitle(dto.getTitle());
         outline.setSummary(dto.getSummary());
@@ -355,6 +364,7 @@ public class NovelServiceImpl implements NovelService {
             throw new BusinessException(ResultCode.NOT_FOUND, "章纲不存在");
         }
         getOwnedNovel(outline.getNovelId(), userId);
+        if (dto.getActId() != null) outline.setActId(dto.getActId());
         if (dto.getChapterNumber() != null) outline.setChapterNumber(dto.getChapterNumber());
         if (dto.getTitle() != null) outline.setTitle(dto.getTitle());
         if (dto.getSummary() != null) outline.setSummary(dto.getSummary());
@@ -501,7 +511,147 @@ public class NovelServiceImpl implements NovelService {
         novelChapterMapper.deleteById(chapterId);
     }
 
+    // ==================== Volume Outlines ====================
+
+    @Override
+    public List<NovelVolume> getVolumes(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        return novelVolumeMapper.selectList(
+                new LambdaQueryWrapper<NovelVolume>()
+                        .eq(NovelVolume::getNovelId, novelId)
+                        .orderByAsc(NovelVolume::getSortOrder));
+    }
+
+    @Override
+    public NovelVolume createVolume(Long novelId, NovelVolumeDTO dto, Long userId) {
+        getOwnedNovel(novelId, userId);
+        NovelVolume volume = new NovelVolume();
+        volume.setNovelId(novelId);
+        volume.setVolumeNumber(dto.getVolumeNumber() != null ? dto.getVolumeNumber() : getNextVolumeNumber(novelId));
+        volume.setTitle(dto.getTitle());
+        volume.setOutline(dto.getOutline());
+        volume.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : volume.getVolumeNumber());
+        volume.setCreatedAt(LocalDateTime.now());
+        volume.setUpdatedAt(LocalDateTime.now());
+        novelVolumeMapper.insert(volume);
+        return volume;
+    }
+
+    @Override
+    public NovelVolume updateVolume(Long volumeId, NovelVolumeDTO dto, Long userId) {
+        NovelVolume volume = novelVolumeMapper.selectById(volumeId);
+        if (volume == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "卷不存在");
+        }
+        getOwnedNovel(volume.getNovelId(), userId);
+        if (dto.getVolumeNumber() != null) volume.setVolumeNumber(dto.getVolumeNumber());
+        if (dto.getTitle() != null) volume.setTitle(dto.getTitle());
+        if (dto.getOutline() != null) volume.setOutline(dto.getOutline());
+        if (dto.getSortOrder() != null) volume.setSortOrder(dto.getSortOrder());
+        volume.setUpdatedAt(LocalDateTime.now());
+        novelVolumeMapper.updateById(volume);
+        return volume;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteVolume(Long volumeId, Long userId) {
+        NovelVolume volume = novelVolumeMapper.selectById(volumeId);
+        if (volume == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "卷不存在");
+        }
+        getOwnedNovel(volume.getNovelId(), userId);
+        // 级联删除该卷下的所有幕
+        novelActMapper.delete(new LambdaQueryWrapper<NovelAct>().eq(NovelAct::getVolumeId, volumeId));
+        novelVolumeMapper.deleteById(volumeId);
+    }
+
+    // ==================== Acts ====================
+
+    @Override
+    public List<NovelAct> getActs(Long novelId, Long userId) {
+        getOwnedNovel(novelId, userId);
+        return novelActMapper.selectList(
+                new LambdaQueryWrapper<NovelAct>()
+                        .eq(NovelAct::getNovelId, novelId)
+                        .orderByAsc(NovelAct::getSortOrder));
+    }
+
+    @Override
+    public List<NovelAct> getActsByVolume(Long volumeId, Long userId) {
+        NovelVolume volume = novelVolumeMapper.selectById(volumeId);
+        if (volume == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "卷不存在");
+        }
+        getOwnedNovel(volume.getNovelId(), userId);
+        return novelActMapper.selectList(
+                new LambdaQueryWrapper<NovelAct>()
+                        .eq(NovelAct::getVolumeId, volumeId)
+                        .orderByAsc(NovelAct::getSortOrder));
+    }
+
+    @Override
+    public NovelAct createAct(Long novelId, NovelActDTO dto, Long userId) {
+        getOwnedNovel(novelId, userId);
+        // 验证 volume 属于该 novel
+        NovelVolume volume = novelVolumeMapper.selectById(dto.getVolumeId());
+        if (volume == null || !volume.getNovelId().equals(novelId)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "卷不存在或不属于该小说");
+        }
+
+        NovelAct act = new NovelAct();
+        act.setNovelId(novelId);
+        act.setVolumeId(dto.getVolumeId());
+        act.setActNumber(dto.getActNumber() != null ? dto.getActNumber() : getNextActNumber(dto.getVolumeId()));
+        act.setTitle(dto.getTitle());
+        act.setOutline(dto.getOutline());
+        act.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : act.getActNumber());
+        act.setCreatedAt(LocalDateTime.now());
+        act.setUpdatedAt(LocalDateTime.now());
+        novelActMapper.insert(act);
+        return act;
+    }
+
+    @Override
+    public NovelAct updateAct(Long actId, NovelActDTO dto, Long userId) {
+        NovelAct act = novelActMapper.selectById(actId);
+        if (act == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "幕不存在");
+        }
+        getOwnedNovel(act.getNovelId(), userId);
+        if (dto.getVolumeId() != null) act.setVolumeId(dto.getVolumeId());
+        if (dto.getActNumber() != null) act.setActNumber(dto.getActNumber());
+        if (dto.getTitle() != null) act.setTitle(dto.getTitle());
+        if (dto.getOutline() != null) act.setOutline(dto.getOutline());
+        if (dto.getSortOrder() != null) act.setSortOrder(dto.getSortOrder());
+        act.setUpdatedAt(LocalDateTime.now());
+        novelActMapper.updateById(act);
+        return act;
+    }
+
+    @Override
+    public void deleteAct(Long actId, Long userId) {
+        NovelAct act = novelActMapper.selectById(actId);
+        if (act == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "幕不存在");
+        }
+        getOwnedNovel(act.getNovelId(), userId);
+        novelActMapper.deleteById(actId);
+    }
+
     // ==================== Helper ====================
+
+    private int getNextVolumeNumber(Long novelId) {
+        Long count = novelVolumeMapper.selectCount(
+                new LambdaQueryWrapper<NovelVolume>().eq(NovelVolume::getNovelId, novelId));
+        return count.intValue() + 1;
+    }
+
+    private int getNextActNumber(Long volumeId) {
+        Long count = novelActMapper.selectCount(
+                new LambdaQueryWrapper<NovelAct>().eq(NovelAct::getVolumeId, volumeId));
+        return count.intValue() + 1;
+    }
 
     private Novel getOwnedNovel(Long novelId, Long userId) {
         Novel novel = novelMapper.selectById(novelId);

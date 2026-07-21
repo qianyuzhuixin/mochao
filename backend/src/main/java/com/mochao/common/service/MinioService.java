@@ -11,6 +11,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -134,5 +136,17 @@ public class MinioService {
         if (filename == null) return "bin";
         int dotIndex = filename.lastIndexOf('.');
         return dotIndex > 0 ? filename.substring(dotIndex + 1).toLowerCase() : "bin";
+    }
+
+    private String getContentType(String extension) {
+        switch (extension.toLowerCase()) {
+            case "mp3": return "audio/mpeg";
+            case "wav": return "audio/wav";
+            case "ogg": return "audio/ogg";
+            case "flac": return "audio/flac";
+            case "aac": return "audio/aac";
+            case "m4a": return "audio/mp4";
+            default: return "application/octet-stream";
+        }
     }
 }

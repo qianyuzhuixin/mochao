@@ -214,4 +214,64 @@ public class NovelController {
         novelService.deleteChapter(chapterId, userId);
         return Result.success();
     }
+
+    // ==================== Volume Outlines（卷纲） ====================
+
+    @GetMapping("/{id}/volumes")
+    public Result<List<NovelVolume>> getVolumes(@PathVariable Long id) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.getVolumes(id, userId));
+    }
+
+    @PostMapping("/{id}/volumes")
+    public Result<NovelVolume> createVolume(@PathVariable Long id, @Valid @RequestBody NovelVolumeDTO dto) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.createVolume(id, dto, userId));
+    }
+
+    @PutMapping("/volumes/{volumeId}")
+    public Result<NovelVolume> updateVolume(@PathVariable Long volumeId, @RequestBody NovelVolumeDTO dto) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.updateVolume(volumeId, dto, userId));
+    }
+
+    @DeleteMapping("/volumes/{volumeId}")
+    public Result<Void> deleteVolume(@PathVariable Long volumeId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        novelService.deleteVolume(volumeId, userId);
+        return Result.success();
+    }
+
+    // ==================== Acts（幕） ====================
+
+    @GetMapping("/{id}/acts")
+    public Result<List<NovelAct>> getActs(@PathVariable Long id) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.getActs(id, userId));
+    }
+
+    @GetMapping("/volumes/{volumeId}/acts")
+    public Result<List<NovelAct>> getActsByVolume(@PathVariable Long volumeId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.getActsByVolume(volumeId, userId));
+    }
+
+    @PostMapping("/{id}/acts")
+    public Result<NovelAct> createAct(@PathVariable Long id, @Valid @RequestBody NovelActDTO dto) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.createAct(id, dto, userId));
+    }
+
+    @PutMapping("/acts/{actId}")
+    public Result<NovelAct> updateAct(@PathVariable Long actId, @RequestBody NovelActDTO dto) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        return Result.success(novelService.updateAct(actId, dto, userId));
+    }
+
+    @DeleteMapping("/acts/{actId}")
+    public Result<Void> deleteAct(@PathVariable Long actId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        novelService.deleteAct(actId, userId);
+        return Result.success();
+    }
 }

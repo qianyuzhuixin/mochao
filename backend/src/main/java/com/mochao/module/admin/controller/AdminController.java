@@ -50,8 +50,9 @@ public class AdminController {
     public Result<Page<Book>> bookList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer size,
-            @RequestParam(required = false) Integer sourceType) {
-        return Result.success(adminService.getBookList(page, size, sourceType));
+            @RequestParam(required = false) Integer sourceType,
+            @RequestParam(required = false) String keyword) {
+        return Result.success(adminService.getBookList(page, size, sourceType, keyword));
     }
 
     @PostMapping("/books")

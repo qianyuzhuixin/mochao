@@ -284,6 +284,27 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
+    public String getPracticeContent(Long bookId, Integer chapterIndex) {
+        if (chapterIndex != null) {
+            // 从章节表获取指定章节内容
+            BookChapter chapter = chapterMapper.selectOne(
+                    new LambdaQueryWrapper<BookChapter>()
+                            .eq(BookChapter::getBookId, bookId)
+                            .eq(BookChapter::getChapterIdx, chapterIndex)
+                            .last("LIMIT 1"));
+            if (chapter != null && chapter.getContent() != null) {
+                return chapter.getContent();
+            }
+        }
+        // 回退：返回全书内容
+        Book book = bookMapper.selectById(bookId);
+        if (book == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "素材不存在");
+        }
+        return book.getContent() != null ? book.getContent() : "";
+    }
+
+    @Override
     public List<ChapterItem> getChapters(Long bookId) {
         Book book = bookMapper.selectById(bookId);
         if (book == null) {

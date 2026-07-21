@@ -24,6 +24,9 @@ public class PracticeSession {
     /** 章节标题 */
     private String chapterTitle;
 
+    /** 练习模式: copy-1:1抄写 summary-摘要写作 */
+    private String mode;
+
     private String status;
 
     private String typedContent;
@@ -47,6 +50,12 @@ public class PracticeSession {
     private Double speed;
 
     private Double score;
+
+    /** 摘要内容（摘要写作模式） */
+    private String summaryContent;
+
+    /** 自写内容（摘要写作模式） */
+    private String selfWrittenContent;
 
     private LocalDateTime createdAt;
 

@@ -3,6 +3,7 @@ package com.mochao.module.collection.dto;
 import lombok.Data;
 
 import javax.validation.constraints.NotBlank;
+import java.util.List;
 
 @Data
 public class CollectionCreateDTO {
@@ -18,7 +19,7 @@ public class CollectionCreateDTO {
 
     private String note;
 
-    private String tags;
+    private List<String> tags;
 
     private String sourceTitle;
 

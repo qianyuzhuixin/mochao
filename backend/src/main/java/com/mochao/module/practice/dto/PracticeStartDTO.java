@@ -12,4 +12,7 @@ public class PracticeStartDTO {
 
     /** 章节索引（null=整本练习） */
     private Integer chapterIndex;
+
+    /** 练习模式: copy-1:1抄写 summary-摘要写作，默认 copy */
+    private String mode;
 }

@@ -17,6 +17,8 @@ import com.mochao.module.book.entity.BookChapter;
 import com.mochao.module.book.mapper.BookChapterMapper;
 import com.mochao.module.book.mapper.BookMapper;
 import com.mochao.module.book.util.ChapterSplitUtil;
+import com.mochao.module.collection.entity.Collection;
+import com.mochao.module.collection.mapper.CollectionMapper;
 import com.mochao.module.novel.entity.Novel;
 import com.mochao.module.novel.mapper.NovelMapper;
 import com.mochao.module.practice.entity.PracticeSession;
@@ -38,6 +40,7 @@ public class AdminServiceImpl implements AdminService {
     private final BookChapterMapper chapterMapper;
     private final NovelMapper novelMapper;
     private final PracticeSessionMapper practiceSessionMapper;
+    private final CollectionMapper collectionMapper;
     private final AdminLogMapper adminLogMapper;
 
     public AdminServiceImpl(UserMapper userMapper,
@@ -45,12 +48,14 @@ public class AdminServiceImpl implements AdminService {
                             BookChapterMapper chapterMapper,
                             NovelMapper novelMapper,
                             PracticeSessionMapper practiceSessionMapper,
+                            CollectionMapper collectionMapper,
                             AdminLogMapper adminLogMapper) {
         this.userMapper = userMapper;
         this.bookMapper = bookMapper;
         this.chapterMapper = chapterMapper;
         this.novelMapper = novelMapper;
         this.practiceSessionMapper = practiceSessionMapper;
+        this.collectionMapper = collectionMapper;
         this.adminLogMapper = adminLogMapper;
     }
 
@@ -124,11 +129,19 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public Page<Book> getBookList(Integer page, Integer size, Integer sourceType) {
+    public Page<Book> getBookList(Integer page, Integer size, Integer sourceType, String keyword) {
         Page<Book> pageObj = new Page<>(page, size);
         LambdaQueryWrapper<Book> wrapper = new LambdaQueryWrapper<>();
         if (sourceType != null) {
             wrapper.eq(Book::getSourceType, sourceType);
+        }
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w
+                    .like(Book::getTitle, keyword)
+                    .or()
+                    .like(Book::getBookName, keyword)
+                    .or()
+                    .like(Book::getAuthor, keyword));
         }
         wrapper.orderByDesc(Book::getCreatedAt);
         return bookMapper.selectPage(pageObj, wrapper);
@@ -196,7 +209,13 @@ public class AdminServiceImpl implements AdminService {
         if (book == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "素材不存在");
         }
+        // 删除关联章节
         chapterMapper.delete(new LambdaQueryWrapper<BookChapter>().eq(BookChapter::getBookId, id));
+        // 删除关联练习记录
+        practiceSessionMapper.delete(new LambdaQueryWrapper<PracticeSession>().eq(PracticeSession::getBookId, id));
+        // 删除关联收藏记录
+        collectionMapper.delete(new LambdaQueryWrapper<Collection>().eq(Collection::getBookId, id));
+        // 删除素材
         bookMapper.deleteById(id);
         saveAdminLog(adminId, "delete_book", "book", id, "删除素材: " + id);
     }

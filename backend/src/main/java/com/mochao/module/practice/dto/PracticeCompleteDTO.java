@@ -11,4 +11,10 @@ public class PracticeCompleteDTO {
     private Integer duration;
     private Double accuracy;
     private Double speed;
+
+    /** 摘要写作模式：摘要内容 */
+    private String summaryContent;
+
+    /** 摘要写作模式：自写内容 */
+    private String selfWrittenContent;
 }

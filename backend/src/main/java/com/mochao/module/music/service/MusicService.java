@@ -15,4 +15,5 @@ public interface MusicService {
     void deleteMusic(Long id, Long userId);
 
     Music toggleFavorite(Long id, Long userId);
+
 }

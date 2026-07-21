@@ -29,4 +29,7 @@ public interface BookService {
 
     /** 从已存储的书籍内容中解析章节列表 */
     List<ChapterItem> getChapters(Long bookId);
+
+    /** 获取练习用的原文内容（按章节或全书） */
+    String getPracticeContent(Long bookId, Integer chapterIndex);
 }

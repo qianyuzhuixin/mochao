@@ -16,7 +16,7 @@ public interface AdminService {
 
     void updateUserStatus(Long userId, Integer status, Long adminId);
 
-    Page<Book> getBookList(Integer page, Integer size, Integer sourceType);
+    Page<Book> getBookList(Integer page, Integer size, Integer sourceType, String keyword);
 
     Book createBook(BookCreateDTO dto, Long adminId);
 

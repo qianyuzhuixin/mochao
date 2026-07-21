@@ -4,7 +4,10 @@
   "description": "MoChao novel ranking scraper — mobile SSR JSON extraction (no browser needed)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
@@ -12,5 +15,8 @@
     "iconv-lite": "^0.7.3",
     "opentype.js": "^2.0.0",
     "pdfkit": "^0.19.1"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2"
   }
 }
